@@ -285,6 +285,7 @@ void ParScanThreadState::undo_alloc_in_to_space(HeapWord* obj,
   }
 }
 
+//打印晋升失败的大小
 void ParScanThreadState::print_promotion_failure_size() {
   if (_promotion_failed_info.has_failed() && PrintPromotionFailure) {
     gclog_or_tty->print(" (%d: promotion failure size = " SIZE_FORMAT ") ",
@@ -921,9 +922,9 @@ void ParNewGeneration::collect(bool   full,
   _gc_timer->register_gc_start();
 
   assert(gch->kind() == CollectedHeap::GenCollectedHeap,
-    "not a CMS generational heap");
+    "not a CMS generational heap");//只有cms能和parNew搭配。判断堆的类型
   AdaptiveSizePolicy* size_policy = gch->gen_policy()->size_policy();
-  FlexibleWorkGang* workers = gch->workers();
+  FlexibleWorkGang* workers = gch->workers();//获取工作线程
   assert(workers != NULL, "Need workgang for parallel work");
   int active_workers =
       AdaptiveSizePolicy::calc_active_workers(workers->total_workers(),
@@ -933,7 +934,7 @@ void ParNewGeneration::collect(bool   full,
   assert(gch->n_gens() == 2,
          "Par collection currently only works with single older gen.");
   _next_gen = gch->next_gen(this);
-  // Do we have to avoid promotion_undo?
+  // Do we have to avoid promotion_undo?我们需要避免取消晋升？
   if (gch->collector_policy()->is_concurrent_mark_sweep_policy()) {
     set_avoid_promotion_undo(true);
   }
@@ -941,10 +942,12 @@ void ParNewGeneration::collect(bool   full,
   // If the next generation is too full to accommodate worst-case promotion
   // from this generation, pass on collection; let the next generation
   // do it.
+  //如果老年代太满了，以至于最坏情况下都不能保证从年轻代晋升，就传递给老年代去处理
   if (!collection_attempt_is_safe()) {
     gch->set_incremental_collection_failed();  // slight lie, in that we did not even attempt one
     return;
   }
+  //如果是安全的
   assert(to()->is_empty(), "Else not collection_attempt_is_safe");
 
   ParNewTracer gc_tracer;
@@ -981,6 +984,7 @@ void ParNewGeneration::collect(bool   full,
                                          *to(), *this, *_next_gen, *task_queues(),
                                          _overflow_stacks, desired_plab_sz(), _term);
 
+//对任务进行分工
   ParNewGenTask tsk(this, _next_gen, reserved().end(), &thread_state_set);
   gch->set_par_threads(n_workers);
   gch->rem_set()->prepare_for_younger_refs_iterate(true);
@@ -1050,6 +1054,7 @@ void ParNewGeneration::collect(bool   full,
 
     adjust_desired_tenuring_threshold();
   } else {
+    //处理晋升失败的情况
     handle_promotion_failed(gch, thread_state_set, gc_tracer);
   }
   // set new iteration safe limit for the survivor spaces

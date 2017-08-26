@@ -272,23 +272,26 @@ ConcurrentMarkSweepGeneration::ConcurrentMarkSweepGeneration(
 }
 
 
-//_initiating_occupancy表示了我们触发一次回收时的占用率
-// The field "_initiating_occupancy" represents the occupancy percentage
-// at which we trigger a new collection cycle.  Unless explicitly specified
-// via CMSInitiatingOccupancyFraction (argument "io" below), it
-// is calculated by:
-//
-//f表示堆最小的空闲比例
-//   Let "f" be MinHeapFreeRatio in
-//CMSTriggerRatio 默认80%
-//    _intiating_occupancy = 100-f +
-//                           f * (CMSTriggerRatio/100)
-//   where CMSTriggerRatio is the argument "tr" below.
-//
-// That is, if we assume the heap is at its desired maximum occupancy at the
-// end of a collection, we let CMSTriggerRatio of the (purported) free
-// space be allocated before initiating a new collection cycle.
-//
+/*
+ The field "_initiating_occupancy" represents the occupancy percentage
+ at which we trigger a new collection cycle.  Unless explicitly specified
+ via CMSInitiatingOccupancyFraction (argument "io" below), it
+ is calculated by:
+   Let "f" be MinHeapFreeRatio in
+    _intiating_occupancy = 100-f +
+                           f * (CMSTriggerRatio/100)
+   where CMSTriggerRatio is the argument "tr" below.
+
+ That is, if we assume the heap is at its desired maximum occupancy at the
+ end of a collection, we let CMSTriggerRatio of the (purported) free
+ space be allocated before initiating a new collection cycle.
+
+_initiating_occupancy字段表示了触发一次回收时的占用率。除非设置了CMSInitiatingOccupancyFraction
+参数(以下用io表示)，否则，就是通过下面的方式计算：
+    f表示MinHeapFreeRatio的值（默认40），CMSTriggerRatio用tr表示,默认值为80，  
+ _intiating_occupancy=100-40+40*(CMSTriggerRatio/100)=92%
+
+*/
 void ConcurrentMarkSweepGeneration::init_initiating_occupancy(intx io, uintx tr) {
   //tr表示触发CMS的比例，默认80%，。IO表示CMSInitiatingOccupancyFraction，即使用率，默认-1
   assert(io <= 100 && tr <= 100, "Check the arguments");
@@ -391,7 +394,11 @@ double CMSStats::cms_free_adjustment_factor(size_t free) const {
 void CMSStats::adjust_cms_free_adjustment_factor(bool fail, size_t free) {
 }
 
-// If promotion failure handling is on use the padded average size of the promotion for each  young generation collection.
+/* If promotion failure handling is on 
+use the padded average size of the promotion for each  young generation collection.
+如果设置了PromotionFailureALot为true,在每一个年轻代收集中使用晋升的平均大小。
+判断估计老年代填满需要的时间
+*/
 double CMSStats::time_until_cms_gen_full() const {
   size_t cms_free = _cms_gen->cmsSpace()->free();
   GenCollectedHeap* gch = GenCollectedHeap::heap();
@@ -433,7 +440,7 @@ duration of the cms collection) can be used.  This
  promotion failures early in execution.  This was
  possibly because the averages were not accurate
  enough at the beginning.
- 将CMS回收的持续时间和cms要回收的分代空闲的剩余时间。
+ 
 */
 double CMSStats::time_until_cms_start() const {
   // We add "gc0_period" to the "work" calculation
@@ -640,11 +647,12 @@ CMSCollector::CMSCollector(ConcurrentMarkSweepGeneration* cmsGen,
     return;
   }
 
-  // Support for multi-threaded concurrent phases
-  /*
+  /* Support for multi-threaded concurrent phases
+  用于支持并发阶段多线程进行
   XX:+CMSConcurrentMTEnabled 
   当该标志被启用时，并发的CMS阶段将以多线程执行（因此，多个GC线程会与所有的应用程序线程并行工作）
-  CMSConcurrentMTEnabled默认为true，ConcGCThreads默认为0，所以ConcGCThreads=(ParallelGCThreads + 3)/4
+  CMSConcurrentMTEnabled默认为true，ConcGCThreads和ParallelGCThreads默认都为0，
+  所以ConcGCThreads=(ParallelGCThreads + 3)/4
   */
   if (CMSConcurrentMTEnabled) {
     if (FLAG_IS_DEFAULT(ConcGCThreads)) {
@@ -911,6 +919,7 @@ bool ConcurrentMarkSweepGeneration::promotion_attempt_is_safe(size_t max_promoti
 // (cms old generation).
 /*
 发生担保失败时产生dump文件
+CMSDumpAtPromotionFailure 默认false
 \openjdk\hotspot\src\share\vm\runtime\globals.hpp
 */
 void ConcurrentMarkSweepGeneration::promotion_failure_occurred() {
@@ -1977,15 +1986,16 @@ NOT_PRODUCT(
 
   set_did_compact(should_compact);
   if (should_compact) {
-    // If the collection is being acquired from the background
-    // collector, there may be references on the discovered
-    // references lists that have NULL referents (being those
-    // that were concurrently cleared by a mutator) or
-    // that are no longer active (having been enqueued concurrently
-    // by the mutator).
-    // Scrub the list of those references because Mark-Sweep-Compact
-    // code assumes referents are not NULL and that all discovered
-    // Reference objects are active.
+    /* If the collection is being acquired from the background collector,
+     there may be references on the discovered
+     references lists that have NULL referents (being those
+     that were concurrently cleared by a mutator) or
+     that are no longer active (having been enqueued concurrently
+     by the mutator).
+     Scrub the list of those references because Mark-Sweep-Compact
+     code assumes referents are not NULL and that all discovered
+     Reference objects are active.
+    */
     ref_processor()->clean_up_discovered_references();
 
     if (first_state > Idling) {
@@ -2010,7 +2020,7 @@ NOT_PRODUCT(
                                            gch->collector_policy());
   } else {
     do_mark_sweep_work(clear_all_soft_refs, first_state,
-      should_start_over);
+      should_start_over);//foreground式的
   }
   // Reset the expansion cause, now that we just completed
   // a collection cycle.
@@ -2029,20 +2039,28 @@ void CMSCollector::compute_new_size() {
   _cmsGen->compute_new_size_free_list();
 }
 
-// A work method used by foreground collection to determine
-// what type of collection (compacting or not, continuing or fresh)
-// it should do.
-// NOTE: the intent is to make UseCMSCompactAtFullCollection
-// and CMSCompactWhenClearAllSoftRefs the default in the future
-// and do away with the flags after a suitable period.
+/* A work method used by foreground collection to determine
+ what type of collection (compacting or not, continuing or fresh)
+ it should do.
+ NOTE: the intent is to make UseCMSCompactAtFullCollection
+ and CMSCompactWhenClearAllSoftRefs the default in the future
+ and do away with the flags after a suitable period.
+ 由foreground GC调用的方法，以此来决定回收的类型（是否做压缩整理，持续的还是重新开始的）
+ 注意：目的是让UseCMSCompactAtFullCollection和CMSCompactWhenClearAllSoftRefs在将来成为默认值，
+ 然后在一个适当的时候，不再使用这些标志
+*/
 void CMSCollector::decide_foreground_collection_type(
   bool clear_all_soft_refs, bool* should_compact,
   bool* should_start_over) {
-  // Normally, we'll compact only if the UseCMSCompactAtFullCollection
-  // flag is set, and we have either requested a System.gc() or
-  // the number of full gc's since the last concurrent cycle
-  // has exceeded the threshold set by CMSFullGCsBeforeCompaction,
-  // or if an incremental collection has failed
+  /* Normally, we'll compact only if the UseCMSCompactAtFullCollection
+   flag is set, and we have either requested a System.gc() or
+   the number of full gc's since the last concurrent cycle
+   has exceeded the threshold set by CMSFullGCsBeforeCompaction,
+   or if an incremental collection has failed
+   正常来讲，如果设置了UseCMSCompactAtFullCollection，我们就会进行压缩整理。
+   而且要么是这次请求是system.gc，要么就是full gc的次数已经超过了CMSFullGCsBeforeCompaction设置的阈值
+   或者也可能是一次增量式的回收失败了
+  */
   GenCollectedHeap* gch = GenCollectedHeap::heap();
   assert(gch->collector_policy()->is_two_generation_policy(),
          "You may want to check the correctness of the following");
@@ -2053,6 +2071,7 @@ void CMSCollector::decide_foreground_collection_type(
            "Should have been noticed, reacted to and cleared");
     _cmsGen->set_incremental_collection_failed();
   }
+
   *should_compact =
     UseCMSCompactAtFullCollection &&
     ((_full_gcs_since_conc_gc >= CMSFullGCsBeforeCompaction) ||
@@ -2063,7 +2082,7 @@ void CMSCollector::decide_foreground_collection_type(
     // We are about to do a last ditch collection attempt
     // so it would normally make sense to do a compaction
     // to reclaim as much space as possible.
-    if (CMSCompactWhenClearAllSoftRefs) {
+    if (CMSCompactWhenClearAllSoftRefs) {//CMSCompactWhenClearAllSoftRefs默认true
       // Default: The rationale is that in this case either
       // we are past the final marking phase, in which case
       // we'd have to start over, or so little has been done
@@ -2091,8 +2110,10 @@ void CMSCollector::decide_foreground_collection_type(
   }
 }
 
-// A work method used by the foreground collector to do
-// a mark-sweep-compact.
+/* A work method used by the foreground collector to do
+ a mark-sweep-compact.
+ foreground gc调用该方法来做一次标记-清除-整理
+*/
 void CMSCollector::do_compaction_work(bool clear_all_soft_refs) {
   GenCollectedHeap* gch = GenCollectedHeap::heap();
 
@@ -2109,7 +2130,7 @@ void CMSCollector::do_compaction_work(bool clear_all_soft_refs) {
   }
 
   // Sample collection interval time and reset for collection pause.
-  if (UseAdaptiveSizePolicy) {
+  if (UseAdaptiveSizePolicy) {//默认true，但在cms中该值设置为false
     size_policy()->msc_collection_begin();
   }
 
@@ -2204,7 +2225,7 @@ void CMSCollector::do_compaction_work(bool clear_all_soft_refs) {
 /* A work method used by the foreground collector to do a mark-sweep, 
 after taking over from a possibly on-going concurrent mark-sweep collection.
 
-由foreground回收器调用的做标记-清除的方法，在接管可能正在运行的并发标记-清除回收之后
+在接管可能正在运行的并发标记-清除回收之后，调用的是foreground式的GC。
 */
 void CMSCollector::do_mark_sweep_work(bool clear_all_soft_refs,
   CollectorState first_state, bool should_start_over) {
@@ -2228,7 +2249,8 @@ void CMSCollector::do_mark_sweep_work(bool clear_all_soft_refs,
       /* In the foreground case don't do the precleaning since
        it is not done concurrently and there is extra work
        required.
-      在foreground CMS中不会做预清理的工作，因为它不是并发执行的，而且需要额外的工作
+      在foreground CMS中不会做预清理的工作，因为它不是并发执行的，而且需要额外的工作,
+      所以直接设置成了最终标记阶段
       */
       _collectorState = FinalMarking;
   }
@@ -2275,8 +2297,10 @@ void CMSCollector::print_eden_and_survivor_chunk_arrays() {
 }
 
 void CMSCollector::getFreelistLocks() const {
-  // Get locks for all free lists in all generations that this
-  // collector is responsible for
+  /* Get locks for all free lists in all generations that this
+   collector is responsible for
+  得到所有分代中的空闲列表的锁
+  */
   _cmsGen->freelistLock()->lock_without_safepoint_check();
 }
 
@@ -2294,10 +2318,13 @@ bool CMSCollector::haveFreelistLocks() const {
   return true;
 }
 
-// A utility class that is used by the CMS collector to
-// temporarily "release" the foreground collector from its
-// usual obligation to wait for the background collector to
-// complete an ongoing phase before proceeding.
+/* A utility class that is used by the CMS collector to
+ temporarily "release" the foreground collector from its
+ usual obligation to wait for the background collector to
+ complete an ongoing phase before proceeding.
+ 一个CMS收集器使用的工具类，用于从foreground gc通常的职责中暂时释放foregorund GC，
+ 来等待background gc完成一个持续的阶段
+*/
 class ReleaseForegroundGC: public StackObj {
  private:
   CMSCollector* _c;
@@ -2327,8 +2354,8 @@ class ReleaseForegroundGC: public StackObj {
  one "collect" method between the background collector and the foreground
  collector but the if-then-else required made it cleaner to have
  separate methods.
-有不同的background CMSGC和foreground gc是因为有不同的对锁的要求。最开始，background和foreground
-共享同一个回收方法，但是if-then-else要求
+ background CMSGC和foreground gc方法分开，是因为有不同的对锁的要求。最开始，尝试将background和foreground
+共享同一个回收方法，但是因为合在一个方法里面，需要加各种if-then-else，所以这2个方法就分开了。
 
 background GC*/
 void CMSCollector::collect_in_background(bool clear_all_soft_refs, GCCause::Cause cause) {
@@ -2342,9 +2369,11 @@ void CMSCollector::collect_in_background(bool clear_all_soft_refs, GCCause::Caus
     FreelistLocker fll(this);
     MutexLockerEx x(CGC_lock, safepoint_check);
     if (_foregroundGCIsActive || !UseAsyncConcMarkSweepGC) {
-      // The foreground collector is active or we're
-      // not using asynchronous collections.  Skip this
-      // background collection.
+      /* The foreground collector is active or we're
+       not using asynchronous collections.  Skip this
+       background collection.
+       如果foreground gc正在进行或者UseAsyncConcMarkSweepGC=false（默认值为true，表示Use Asynchronous Concurrent Mark-Sweep GC in the old generation）
+       */
       assert(!_foregroundGCShouldWait, "Should be clear");
       return;
     } else {
@@ -2375,14 +2404,18 @@ void CMSCollector::collect_in_background(bool clear_all_soft_refs, GCCause::Caus
     prev_used = _cmsGen->used(); // XXXPERM
   }
 
-  // The change of the collection state is normally done at this level;
-  // the exceptions are phases that are executed while the world is
-  // stopped.  For those phases the change of state is done while the
-  // world is stopped.  For baton passing purposes this allows the
-  // background collector to finish the phase and change state atomically.
-  // The foreground collector cannot wait on a phase that is done
-  // while the world is stopped because the foreground collector already
-  // has the world stopped and would deadlock.
+  /* The change of the collection state is normally done at this level;
+   the exceptions are phases that are executed while the world is
+   stopped.  For those phases the change of state is done while the
+   world is stopped.  For baton passing purposes this allows the
+   background collector to finish the phase and change state atomically.
+   The foreground collector cannot wait on a phase that is done
+   while the world is stopped because the foreground collector already
+   has the world stopped and would deadlock.
+   在这个阶段完成了回收状态的变化，除了那些在STW时运行的阶段。那些阶段在stw的时候完成
+   为了传递，它允许background 回收器结束阶段然后自动改变状态。
+   foreground回收器不能在stw的时候的阶段等待，因为foreground已经造成stw，这会导致死锁
+  */
   while (_collectorState != Idling) {
     if (TraceCMSState) {
       gclog_or_tty->print_cr("Thread " INTPTR_FORMAT " in CMS state %d",
@@ -4724,7 +4757,7 @@ void CMSCollector::preclean() {
 }
 
 // Try and schedule the remark such that young gen occupancy is CMSScheduleRemarkEdenPenetration %.
-/*试着和计划重新标记 占用率是 CMSScheduleRemarkEdenPenetration%，默认50%
+/*尝试计划重新标记，为了让年轻代的占用率在CMSScheduleRemarkEdenPenetration%（默认50%）
 并发可中止预清理
 */
 void CMSCollector::abortable_preclean() {
@@ -4741,7 +4774,7 @@ void CMSCollector::abortable_preclean() {
 
    如果eden区当前的使用量小于阈值，就会直接进行重新标记；
    否则进行下一次预清理为了上面描述的暂停。
-   通过设置CMSScheduleRemarkEdenSizeThreshold>eden最大的size，就不会做预清理操作
+   通过设置CMSScheduleRemarkEdenSizeThreshold>eden最大的size，就不会做可中止预清理操作
    通过设置CMSScheduleRemarkEdenSizeThreshold 默认2m
   */
   if (get_eden_used() > CMSScheduleRemarkEdenSizeThreshold) {
@@ -4767,7 +4800,7 @@ void CMSCollector::abortable_preclean() {
       // Voluntarily terminate abortable preclean phase if we have
       // been at it for too long.
       if ((CMSMaxAbortablePrecleanLoops != 0) &&
-          loops >= CMSMaxAbortablePrecleanLoops) {//可中止预清理的最大循环次数
+          loops >= CMSMaxAbortablePrecleanLoops) {//可中止预清理的最大循环次数，默认0
         if (PrintGCDetails) {
           gclog_or_tty->print(" CMS: abort preclean due to loops ");
         }
@@ -4805,7 +4838,8 @@ void CMSCollector::abortable_preclean() {
   return;
 }
 
-// Respond to an Eden sampling opportunity
+// Respond to an Eden sampling 
+//对eden区的抽样做出回应
 void CMSCollector::sample_eden() {
   // Make sure a young gc cannot sneak in between our
   // reading and recording of a sample.
@@ -6880,11 +6914,12 @@ size_t const CMSCollector::skip_header_HeapWords() {
   return FreeChunk::header_size();
 }
 
-// Try and collect here conditions that should hold when
-// CMS thread is exiting. The idea is that the foreground GC
-// thread should not be blocked if it wants to terminate
-// the CMS thread and yet continue to run the VM for a while
-// after that.
+/* Try and collect here conditions that should hold when
+ CMS thread is exiting. The idea is that the foreground GC
+ thread should not be blocked if it wants to terminate
+ the CMS thread and yet continue to run the VM for a while
+ after that.
+*/
 void CMSCollector::verify_ok_to_terminate() const {
   assert(Thread::current()->is_ConcurrentGC_thread(),
          "should be called by CMS thread");

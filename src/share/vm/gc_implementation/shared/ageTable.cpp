@@ -79,21 +79,25 @@ void ageTable::merge_par(ageTable* subTable) {
 }
 
 uint ageTable::compute_tenuring_threshold(size_t survivor_capacity) {
+  //TargetSurvivorRatio默认50，意思是：在回收之后希望survivor区的占用率达到这个比例
   size_t desired_survivor_size = (size_t)((((double) survivor_capacity)*TargetSurvivorRatio)/100);
   size_t total = 0;
   uint age = 1;
   assert(sizes[0] == 0, "no objects with age zero should be recorded");
-  while (age < table_size) {
+  while (age < table_size) {//table_size=16
     total += sizes[age];
     // check if including objects of age 'age' made us pass the desired
     // size, if so 'age' is the new threshold
+    //如果加上这个年龄的所有对象的大小之后，占用量>期望的大小，就设置age为新的晋升阈值
     if (total > desired_survivor_size) break;
     age++;
   }
+
   uint result = age < MaxTenuringThreshold ? age : MaxTenuringThreshold;
 
   if (PrintTenuringDistribution || UsePerfData) {
 
+    //打印期望的survivor的大小以及新计算出来的阈值，和设置的最大阈值
     if (PrintTenuringDistribution) {
       gclog_or_tty->cr();
       gclog_or_tty->print_cr("Desired survivor size " SIZE_FORMAT " bytes, new threshold %u (max %u)",
@@ -105,7 +109,7 @@ uint ageTable::compute_tenuring_threshold(size_t survivor_capacity) {
     while (age < table_size) {
       total += sizes[age];
       if (sizes[age] > 0) {
-        if (PrintTenuringDistribution) {
+        if (PrintTenuringDistribution) {//打印各个年龄所占的空间
           gclog_or_tty->print_cr("- age %3u: " SIZE_FORMAT_W(10) " bytes, " SIZE_FORMAT_W(10) " total",
                                         age,    sizes[age]*oopSize,          total*oopSize);
         }
@@ -125,5 +129,5 @@ uint ageTable::compute_tenuring_threshold(size_t survivor_capacity) {
     }
   }
 
-  return result;
+  return result;//最终返回计算的阈值
 }

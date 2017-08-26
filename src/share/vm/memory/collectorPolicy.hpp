@@ -62,8 +62,8 @@ class CollectorPolicy : public CHeapObj<mtGC> {
   GCPolicyCounters* _gc_policy_counters;
 
   virtual void initialize_alignments() = 0;
-  virtual void initialize_flags();
-  virtual void initialize_size_info();
+  virtual void initialize_flags();//负责对新生代、老年代以及永久代设置的内存大小进行调整。
+  virtual void initialize_size_info();//设置新生代、老年代以及永久代的容量，包括初始值、最小值和最大值
 
   DEBUG_ONLY(virtual void assert_flags();)
   DEBUG_ONLY(virtual void assert_size_info();)

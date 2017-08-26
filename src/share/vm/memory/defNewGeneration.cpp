@@ -892,6 +892,7 @@ void DefNewGeneration::reset_scratch() {
   }
 }
 
+//回收是否安全（是指可能需要晋升，而老年代放不下时就不安全了）
 bool DefNewGeneration::collection_attempt_is_safe() {
   if (!to()->is_empty()) {
     if (Verbose && PrintGCDetails) {
@@ -903,6 +904,9 @@ bool DefNewGeneration::collection_attempt_is_safe() {
     GenCollectedHeap* gch = GenCollectedHeap::heap();
     _next_gen = gch->next_gen(this);
   }
+  /*
+  used() 返回eden区和from区使用的空间的大小
+  */
   return _next_gen->promotion_attempt_is_safe(used());
 }
 

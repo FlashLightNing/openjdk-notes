@@ -457,10 +457,14 @@ public:
   // call to "save_marks".
   bool no_allocs_since_save_marks(int level);
 
-  // Returns true if an incremental collection is likely to fail.
-  // We optionally consult the young gen, if asked to do so;
-  // otherwise we base our answer on whether the previous incremental
-  // collection attempt failed with no corrective action as of yet.
+  /* Returns true if an incremental collection is likely to fail.
+   We optionally consult the young gen, if asked to do so;
+   otherwise we base our answer on whether the previous incremental
+   collection attempt failed with no corrective action as of yet.
+   当一次增量式的回收可能失败时，返回true。
+   或者我们也可以选择是否参考年轻代。
+   否则
+  */
   bool incremental_collection_will_fail(bool consult_young) {
     // Assumes a 2-generation system; the first disjunct remembers if an
     // incremental collection failed, even when we thought (second disjunct)

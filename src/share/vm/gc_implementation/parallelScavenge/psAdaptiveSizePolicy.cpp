@@ -1179,10 +1179,13 @@ uint PSAdaptiveSizePolicy::compute_survivor_space_size_and_threshold(
     return tenuring_threshold;
   }
 
-  // We'll decide whether to increase or decrease the tenuring
-  // threshold based partly on the newly computed survivor size
-  // (if we hit the maximum limit allowed, we'll always choose to
-  // decrement the threshold).
+  /* We'll decide whether to increase or decrease the tenuring
+   threshold based partly on the newly computed survivor size
+   (if we hit the maximum limit allowed, we'll always choose to
+   decrement the threshold).
+  我们将会决定是增加还是减少tenuring的阈值，部分基于新计算的survivor大小
+  （如果我们达到允许的最大值，我们总会选择减少阈值）
+  */
   bool incr_tenuring_threshold = false;
   bool decr_tenuring_threshold = false;
 
@@ -1191,22 +1194,30 @@ uint PSAdaptiveSizePolicy::compute_survivor_space_size_and_threshold(
   set_decrement_tenuring_threshold_for_survivor_limit(false);
 
   if (!is_survivor_overflow) {
-    // Keep running averages on how much survived
-
-    // We use the tenuring threshold to equalize the cost of major
-    // and minor collections.
-    // ThresholdTolerance is used to indicate how sensitive the
-    // tenuring threshold is to differences in cost betweent the
-    // collection types.
-
-    // Get the times of interest. This involves a little work, so
-    // we cache the values here.
-    const double major_cost = major_gc_cost();
-    const double minor_cost = minor_gc_cost();
+    /* Keep running averages on how much survived
+     We use the tenuring threshold to equalize the cost of major
+     and minor collections.
+     ThresholdTolerance is used to indicate how sensitive the
+     tenuring threshold is to differences in cost betweent the
+     collection types.
+  
+     Get the times of interest. This involves a little work, so
+     we cache the values here.
+     对于有多少幸存下来保持平均水平
+     我们使用晋升年龄来补偿major gc和minor gc的消耗。
+     ThresholdTolerance 默认10
+     Allowed collection cost difference between generations
+     ThresholdTolerance被用于暗示对于区别，晋升年龄有多敏感。
+     在回收类型之间的消耗。
+     得到利益的时候，需要消耗一些性能，所以我们在这缓存了值
+*/
+    const double major_cost = major_gc_cost();//full gc的耗时
+    const double minor_cost = minor_gc_cost();//young gc的耗时
 
     if (minor_cost > major_cost * _threshold_tolerance_percent) {
       // Minor times are getting too long;  lower the threshold so
       // less survives and more is promoted.
+      
       decr_tenuring_threshold = true;
       set_decrement_tenuring_threshold_for_gc_cost(true);
     } else if (major_cost > minor_cost * _threshold_tolerance_percent) {
@@ -1216,14 +1227,6 @@ uint PSAdaptiveSizePolicy::compute_survivor_space_size_and_threshold(
     }
 
   } else {
-    // Survivor space overflow occurred, so promoted and survived are
-    // not accurate. We'll make our best guess by combining survived
-    // and promoted and count them as survivors.
-    //
-    // We'll lower the tenuring threshold to see if we can correct
-    // things. Also, set the survivor size conservatively. We're
-    // trying to avoid many overflows from occurring if defnew size
-    // is just too small.
 
     decr_tenuring_threshold = true;
   }
@@ -1236,6 +1239,7 @@ uint PSAdaptiveSizePolicy::compute_survivor_space_size_and_threshold(
                                      _space_alignment);
   target_size = MAX2(target_size, _space_alignment);
 
+//survivor_limit：survivor区最大的内存大小
   if (target_size > survivor_limit) {
     // Target size is bigger than we can handle. Let's also reduce
     // the tenuring threshold.

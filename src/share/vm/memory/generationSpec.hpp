@@ -27,10 +27,13 @@
 
 #include "memory/generation.hpp"
 
-// The specification of a generation.  This class also encapsulates
-// some generation-specific behavior.  This is done here rather than as a
-// virtual function of Generation because these methods are needed in
-// initialization of the Generations.
+/* The specification of a generation.  This class also encapsulates
+ some generation-specific behavior.  This is done here rather than as a
+ virtual function of Generation because these methods are needed in
+ initialization of the Generations.
+ 分代的描述。该类也封装了一些分代细节行为。这些方法在这而不是作为generation中的虚方法
+ 是因为这些方法需要在分代的初始化中用到。
+*/
 class GenerationSpec : public CHeapObj<mtGC> {
   friend class VMStructs;
 private:

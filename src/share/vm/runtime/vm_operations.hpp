@@ -38,6 +38,7 @@
 #define VM_OP_ENUM(type)   VMOp_##type,
 
 // Note: When new VM_XXX comes up, add 'XXX' to the template table.
+//下面这些都是vm操作
 #define VM_OPS_DO(template)                       \
   template(Dummy)                                 \
   template(ThreadStop)                            \

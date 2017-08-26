@@ -28,6 +28,9 @@
 #include "runtime/handles.hpp"
 #include "utilities/globalDefinitions.hpp"
 
+/*
+在tlab外分配内存
+*/
 void AllocTracer::send_allocation_outside_tlab_event(KlassHandle klass, size_t alloc_size) {
   EventAllocObjectOutsideTLAB event;
   if (event.should_commit()) {
@@ -36,7 +39,9 @@ void AllocTracer::send_allocation_outside_tlab_event(KlassHandle klass, size_t a
     event.commit();
   }
 }
-
+/*
+在tlab内分配内存
+*/
 void AllocTracer::send_allocation_in_new_tlab_event(KlassHandle klass, size_t tlab_size, size_t alloc_size) {
   EventAllocObjectInNewTLAB event;
   if (event.should_commit()) {

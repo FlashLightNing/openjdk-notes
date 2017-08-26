@@ -58,6 +58,10 @@ void ConcurrentMarkSweepPolicy::initialize_generations() {
   if (_generations == NULL)
     vm_exit_during_initialization("Unable to allocate gen spec");
 
+/*
+ _generations[0] 表示年轻代
+  _generations[1] 表示老年代
+*/
   if (UseParNewGC) {
     if (UseAdaptiveSizePolicy) {
       _generations[0] = new GenerationSpec(Generation::ASParNew,

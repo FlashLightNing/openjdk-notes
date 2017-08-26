@@ -32,10 +32,10 @@
 /* Copyright (c) 1992-2009 Oracle and/or its affiliates, and Stanford University.
    See the LICENSE file for license information. */
 
-// Age table for adaptive feedback-mediated tenuring (scavenging)
-//
-// Note: all sizes are in oops
-
+/* Age table for adaptive feedback-mediated tenuring (scavenging)
+ Note: all sizes are in oops
+  为自适应反馈调整晋升（清扫）的ageTable
+*/
 class ageTable VALUE_OBJ_CLASS_SPEC {
   friend class VMStructs;
 
@@ -46,8 +46,11 @@ class ageTable VALUE_OBJ_CLASS_SPEC {
   // instance variables
   size_t sizes[table_size];
 
-  // constructor.  "global" indicates that this is the global age table
-  // (as opposed to gc-thread-local)
+  /* constructor.  "global" indicates that this is the global age table
+   (as opposed to gc-thread-local)
+   构造器,global表示这个是jvm全局的age table。
+   反之则是gc-thread-local
+*/
   ageTable(bool global = true);
 
   // clear table
@@ -57,11 +60,14 @@ class ageTable VALUE_OBJ_CLASS_SPEC {
   void add(oop p, size_t oop_size) {
     uint age = p->age();
     assert(age > 0 && age < table_size, "invalid age of object");
-    sizes[age] += oop_size;
+    sizes[age] += oop_size;//把该对象占的大小统计到这个年龄的所有对象大小之和。
   }
 
-  // Merge another age table with the current one.  Used
-  // for parallel young generation gc.
+  /* Merge another age table with the current one.  Used
+   for parallel young generation gc.
+   将另一个age table合并到这个表。
+   在并行young gc中会用到。
+  */
   void merge(ageTable* subTable);
   void merge_par(ageTable* subTable);
 

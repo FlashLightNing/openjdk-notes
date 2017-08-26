@@ -31,7 +31,7 @@
 
 //
 // Prioritized queue of VM operations.
-//
+//VM操作的优先级队列
 // Encapsulates both queue management and
 // and priority policy
 //
@@ -44,6 +44,11 @@ class VMOperationQueue : public CHeapObj<mtInternal> {
   };
 
   // We maintain a doubled linked list, with explicit count.
+  /*
+  准确的说，是数组+链表，跟map的结构有点像，不同链表是不同的优先级的VM操作
+  如果Priorities枚举类中的优先级分别是0,1,2的话，
+  _queue[0],_queue[1],_queue[2]就是3个链表，存着不同优先级的操作
+  */
   int           _queue_length[nof_priorities];
   int           _queue_counter;
   VM_Operation* _queue       [nof_priorities];
@@ -84,11 +89,13 @@ class VMOperationQueue : public CHeapObj<mtInternal> {
 };
 
 
-//
-// A single VMThread (the primordial thread) spawns all other threads
-// and is itself used by other threads to offload heavy vm operations
-// like scavenge, garbage_collect etc.
-//
+/*
+ A single VMThread (the primordial thread) spawns all other threads
+ and is itself used by other threads to offload heavy vm operations
+ like scavenge, garbage_collect etc.
+一个单线程（最开始的线程）产生了所有其他的线程，而且这个线程被其他线程用于
+分流重的VM操作，比如清扫，垃圾回收等
+*/
 
 class VMThread: public NamedThread {
  private:

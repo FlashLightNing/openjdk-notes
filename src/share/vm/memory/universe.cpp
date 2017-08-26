@@ -790,6 +790,9 @@ char* Universe::preferred_heap_base(size_t heap_size, size_t alignment, NARROW_O
   return (char*)base; // also return NULL (don't care) for 32-bit VM
 }
 
+/*
+堆初始化
+*/
 jint Universe::initialize_heap() {
 
   if (UseParallelGC) {
@@ -817,7 +820,7 @@ jint Universe::initialize_heap() {
     } else if (UseConcMarkSweepGC) {
 #if INCLUDE_ALL_GCS
       if (UseAdaptiveSizePolicy) {
-        gc_policy = new ASConcurrentMarkSweepPolicy();
+        gc_policy = new ASConcurrentMarkSweepPolicy();//异步策略
       } else {
         gc_policy = new ConcurrentMarkSweepPolicy();
       }
@@ -829,6 +832,7 @@ jint Universe::initialize_heap() {
     }
     gc_policy->initialize_all();
 
+/*GenCollectedHeap 是接口类？*/
     Universe::_collectedHeap = new GenCollectedHeap(gc_policy);
   }
 

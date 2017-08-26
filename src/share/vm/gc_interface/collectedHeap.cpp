@@ -261,6 +261,9 @@ void CollectedHeap::check_for_valid_allocation_state() {
 }
 #endif
 
+/*
+在tlab上分配空间
+*/
 HeapWord* CollectedHeap::allocate_from_tlab_slow(KlassHandle klass, Thread* thread, size_t size) {
 
   // Retain tlab and allocate object in shared space if
@@ -496,6 +499,9 @@ void CollectedHeap::post_initialize() {
   collector_policy()->post_heap_initialize();
 }
 
+/*
+分配新的tlab
+*/
 HeapWord* CollectedHeap::allocate_new_tlab(size_t size) {
   guarantee(false, "thread-local allocation buffers not supported");
   return NULL;
@@ -557,6 +563,7 @@ void CollectedHeap::resize_all_tlabs() {
 }
 
 void CollectedHeap::pre_full_gc_dump(GCTimer* timer) {
+  //Dump heap to file before any major stop-the-world GC 默认false
   if (HeapDumpBeforeFullGC) {
     GCTraceTime tt("Heap Dump (before full gc): ", PrintGCDetails, false, timer, GCId::create());
     // We are doing a "major" collection and a heap dump before

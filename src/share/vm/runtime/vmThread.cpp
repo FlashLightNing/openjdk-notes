@@ -184,6 +184,7 @@ VM_Operation* VMOperationQueue::remove_next() {
 
   // simple counter based scheduling to prevent starvation of lower priority
   // queue. -- see 4390175
+  //避免低优先级线程饿死
   int high_prio, low_prio;
   if (_queue_counter++ < 10) {
       high_prio = SafepointPriority;
@@ -238,7 +239,7 @@ void VMThread::create() {
 
 
 VMThread::VMThread() : NamedThread() {
-  set_name("VM Thread");
+  set_name("VM Thread");//可以通过jstack pid|grep VM 查到
 }
 
 void VMThread::destroy() {
@@ -251,7 +252,7 @@ void VMThread::destroy() {
 void VMThread::run() {
   assert(this == vm_thread(), "check");
 
-  this->initialize_thread_local_storage();
+  this->initialize_thread_local_storage();//初始化线程本地存储区，和TLAB是否一致？
   this->record_stack_base_and_size();
   // Notify_lock wait checks on active_handles() to rewait in
   // case of spurious wakeup, it should wait on the last
@@ -267,12 +268,16 @@ void VMThread::run() {
   int prio = (VMThreadPriority == -1)
     ? os::java_to_os_priority[NearMaxPriority]
     : VMThreadPriority;
-  // Note that I cannot call os::set_priority because it expects Java
-  // priorities and I am *explicitly* using OS priorities so that it's
-  // possible to set the VM thread priority higher than any Java thread.
+  /* Note that I cannot call os::set_priority because it expects Java
+   priorities and I am *explicitly* using OS priorities so that it's
+   possible to set the VM thread priority higher than any Java thread.
+   注意：我不能在这里调用os:set_priority方法，因为这个方法是使用os的属性来设置优先级，
+   但是这里应该是java线程的优先级，如果用os的，可能会比任何一个java线程的优先级都高
+  */
   os::set_native_priority( this, prio );
 
   // Wait for VM_Operations until termination
+  //循环从队列中取的任务，然后处理
   this->loop();
 
   // Note the intention to exit before safepointing.
@@ -328,8 +333,10 @@ void VMThread::run() {
 }
 
 
-// Notify the VMThread that the last non-daemon JavaThread has terminated,
-// and wait until operation is performed.
+/* Notify the VMThread that the last non-daemon JavaThread has terminated,
+ and wait until operation is performed.
+ 唤醒VM线程，最后一个非守护的java线程已经终止了，然后等待直到操作完成。
+*/
 void VMThread::wait_for_vm_thread_exit() {
   { MutexLocker mu(VMOperationQueue_lock);
     _should_terminate = true;
@@ -430,13 +437,14 @@ void VMThread::loop() {
       _cur_vm_operation = _vm_queue->remove_next();
 
       // Stall time tracking code
+      //PrintVMQWaitTime:Print out the waiting time in VM operation queue 默认false
       if (PrintVMQWaitTime && _cur_vm_operation != NULL &&
           !_cur_vm_operation->evaluate_concurrently()) {
         long stall = os::javaTimeMillis() - _cur_vm_operation->timestamp();
         if (stall > 0)
           tty->print_cr("%s stall: %Ld",  _cur_vm_operation->name(), stall);
       }
-
+      //如果从队列中已经没有任务了
       while (!should_terminate() && _cur_vm_operation == NULL) {
         // wait with a timeout to guarantee safepoints at regular intervals
         bool timedout =
@@ -444,6 +452,8 @@ void VMThread::loop() {
                                       GuaranteedSafepointInterval);
 
         // Support for self destruction
+        //Will cause VM to terminate after a given time (in minutes)
+        //默认0，如果>0，在给定的时间没有，就退出
         if ((SelfDestructTimer != 0) && !is_error_reported() &&
             (os::elapsedTime() > SelfDestructTimer * 60)) {
           tty->print_cr("VM self-destructed");
@@ -590,11 +600,12 @@ void VMThread::execute(VM_Operation* op) {
   Thread* t = Thread::current();
 
   if (!t->is_VM_thread()) {
+    //不是VM线程
     SkipGCALot sgcalot(t);    // avoid re-entrant attempts to gc-a-lot
-    // JavaThread or WatcherThread
+    // JavaThread or WatcherThread 判断是java线程还是监控线程
     bool concurrent = op->evaluate_concurrently();
     // only blocking VM operations need to verify the caller's safepoint state:
-    if (!concurrent) {
+    if (!concurrent) {//如果不能并发执行，就检测调用者是不是在safepoint区域
       t->check_for_valid_safepoint_state(true);
     }
 
@@ -647,6 +658,7 @@ void VMThread::execute(VM_Operation* op) {
       op->doit_epilogue();
     }
   } else {
+    //是VM线程的操作
     // invoked by VM thread; usually nested VM operation
     assert(t->is_VM_thread(), "must be a VM thread");
     VM_Operation* prev_vm_operation = vm_operation();

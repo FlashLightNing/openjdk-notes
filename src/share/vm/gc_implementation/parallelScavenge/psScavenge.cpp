@@ -602,15 +602,15 @@ bool PSScavenge::invoke_no_policy() {
 
           size_policy->decay_supplemental_growth(false /* not full gc*/);
         }
-        // Resize the young generation at every collection
-        // even if new sizes have not been calculated.  This is
-        // to allow resizes that may have been inhibited by the
-        // relative location of the "to" and "from" spaces.
+        /* Resize the young generation at every collection
+         even if new sizes have not been calculated.  This is
+         to allow resizes that may have been inhibited by the
+         relative location of the "to" and "from" spaces.
 
-        // Resizing the old gen at minor collects can cause increases
-        // that don't feed back to the generation sizing policy until
-        // a major collection.  Don't resize the old gen here.
-
+         Resizing the old gen at minor collects can cause increases
+         that don't feed back to the generation sizing policy until
+         a major collection.  Don't resize the old gen here.
+        */
         heap->resize_young_gen(size_policy->calculated_eden_size_in_bytes(),
                         size_policy->calculated_survivor_size_in_bytes());
 
@@ -830,7 +830,7 @@ GCTaskManager* const PSScavenge::gc_task_manager() {
 void PSScavenge::initialize() {
   // Arguments must have been parsed
 
-  if (AlwaysTenure) {
+  if (AlwaysTenure) {//Always tenure objects in eden (ParallelGC only) 
     _tenuring_threshold = 0;
   } else if (NeverTenure) {
     _tenuring_threshold = markOopDesc::max_age + 1;

@@ -720,6 +720,7 @@ public:
 };
 
 // A single WatcherThread is used for simulating timer interrupts.
+//一个单线程用于模拟时间打断
 class WatcherThread: public Thread {
   friend class VMStructs;
  public:
