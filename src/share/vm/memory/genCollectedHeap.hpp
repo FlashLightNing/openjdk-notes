@@ -69,12 +69,15 @@ public:
   // The generational collector policy.
   GenCollectorPolicy* _gen_policy;
 
-  // Indicates that the most recent previous incremental collection failed.
-  // The flag is cleared when an action is taken that might clear the
-  // condition that caused that incremental collection to fail.
-  bool _incremental_collection_failed;
+  /* Indicates that the most recent previous incremental collection failed.
+   The flag is cleared when an action is taken that might clear the
+   condition that caused that incremental collection to fail.
+  */
+   bool _incremental_collection_failed;
 
-  // In support of ExplicitGCInvokesConcurrent functionality
+  /* In support of ExplicitGCInvokesConcurrent functionality
+  为了支持ExplicitGCInvokesConcurrent 的功能
+  */
   unsigned int _full_collections_completed;
 
   // Data structure for claiming the (potentially) parallel tasks in
@@ -105,9 +108,11 @@ protected:
   // have handled it (including collection, expansion, etc.)
   HeapWord* satisfy_failed_allocation(size_t size, bool is_tlab);
 
-  // Callback from VM_GenCollectFull operation.
-  // Perform a full collection of the first max_level+1 generations.
-  virtual void do_full_collection(bool clear_all_soft_refs);
+  /* Callback from VM_GenCollectFull operation.
+   Perform a full collection of the first max_level+1 generations.
+   VM_GenCollectFull 回调的方法。
+  */
+   virtual void do_full_collection(bool clear_all_soft_refs);
   void do_full_collection(bool clear_all_soft_refs, int max_level);
 
   // Does the "cause" of GC indicate that
@@ -463,13 +468,18 @@ public:
    collection attempt failed with no corrective action as of yet.
    当一次增量式的回收可能失败时，返回true。
    或者我们也可以选择是否参考年轻代。
-   否则
+   否则我们出于以下来给出我们的答案：之前是否有一次增量回收失败，而且迄今为止没有正确的行为
+   意思是，如果之前担保失败过，则返回TRUE。若consult_young=true，则会再进行一次判断是否安全
+   当发生了一次担保失败，该值为true，然后会进行GC,当GC完就会清除该标记。
+   所以如果在该值=TRUE的时候发生一次内存分配失败引发的GC，就会用FULLGC。
   */
   bool incremental_collection_will_fail(bool consult_young) {
-    // Assumes a 2-generation system; the first disjunct remembers if an
-    // incremental collection failed, even when we thought (second disjunct)
-    // that it would not.
-    assert(heap()->collector_policy()->is_two_generation_policy(),
+    /* Assumes a 2-generation system; the first disjunct remembers if an incremental collection failed,
+     even when we thought (second disjunct)
+     that it would not.
+     假设是一个2分代系统;如果一次增量收集失败，第一个分代会记记得，即使我们认为（第二个分代）不会失败。
+    */
+     assert(heap()->collector_policy()->is_two_generation_policy(),
            "the following definition may not be suitable for an n(>2)-generation system");
     return incremental_collection_failed() ||
            (consult_young && !get_gen(0)->collection_attempt_is_safe());
@@ -480,6 +490,12 @@ public:
   bool incremental_collection_failed() const {
     return _incremental_collection_failed;
   }
+
+  /*
+  在年轻代!collection_attempt_is_safe，时会设置true，即老年代放不下年轻代可能晋升的对象时，设置该值为true
+  该方法都是在担保可能失败的时候会设置为true
+  只有在CMS的并发清除阶段才会清空该标志位。
+  */
   void set_incremental_collection_failed() {
     _incremental_collection_failed = true;
   }

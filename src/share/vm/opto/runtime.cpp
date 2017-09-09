@@ -229,7 +229,7 @@ void OptoRuntime::new_store_pre_barrier(JavaThread* thread) {
   thread->set_vm_result(new_obj);
 }
 
-// object allocation
+// object allocation对象分配
 JRT_BLOCK_ENTRY(void, OptoRuntime::new_instance_C(Klass* klass, JavaThread* thread))
   JRT_BLOCK;
 #ifndef PRODUCT
@@ -240,7 +240,7 @@ JRT_BLOCK_ENTRY(void, OptoRuntime::new_instance_C(Klass* klass, JavaThread* thre
   // These checks are cheap to make and support reflective allocation.
   int lh = klass->layout_helper();
   if (Klass::layout_helper_needs_slow_path(lh)
-      || !InstanceKlass::cast(klass)->is_initialized()) {
+      || !InstanceKlass::cast(klass)->is_initialized()) {//如果这个类已经链接过了，则快速分配
     KlassHandle kh(THREAD, klass);
     kh->check_valid_for_instantiation(false, THREAD);
     if (!HAS_PENDING_EXCEPTION) {

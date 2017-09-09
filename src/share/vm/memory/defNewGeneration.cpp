@@ -229,6 +229,11 @@ DefNewGeneration::DefNewGeneration(ReservedSpace rs,
   update_counters();
   _next_gen = NULL;
   _tenuring_threshold = MaxTenuringThreshold;
+  /*
+  PretenureSizeThreshold 默认0
+  Maximum size in bytes of objects allocated in DefNew "      
+          "generation; zero means no maximum
+  */
   _pretenure_size_threshold_words = PretenureSizeThreshold >> LogHeapWordSize;
 
   _gc_timer = new (ResourceObj::C_HEAP, mtGC) STWGCTimer();
@@ -321,6 +326,7 @@ void DefNewGeneration::compute_space_boundaries(uintx minimum_eden_size,
   from()->set_next_compaction_space(NULL);
 }
 
+//交换s和t区
 void DefNewGeneration::swap_spaces() {
   ContiguousSpace* s = from();
   _from_space        = to();
@@ -460,7 +466,7 @@ void DefNewGeneration::younger_refs_iterate(OopsInGenClosure* cl) {
 
 size_t DefNewGeneration::capacity() const {
   return eden()->capacity()
-       + from()->capacity();  // to() is only used during scavenge
+       + from()->capacity();  // to() is only used during scavenge to区只会在清扫时用到
 }
 
 
@@ -512,6 +518,7 @@ void DefNewGeneration::space_iterate(SpaceClosure* blk,
 
 // The last collection bailed out, we are running out of heap space,
 // so we try to allocate the from-space, too.
+//尝试在from区分配
 HeapWord* DefNewGeneration::allocate_from_space(size_t size) {
   HeapWord* result = NULL;
   if (Verbose && PrintGCDetails) {
@@ -551,6 +558,7 @@ HeapWord* DefNewGeneration::expand_and_allocate(size_t size,
   return allocate(size, is_tlab);
 }
 
+//调整晋升的阈值
 void DefNewGeneration::adjust_desired_tenuring_threshold() {
   // Set the desired survivor size to half the real survivor space
   _tenuring_threshold =
@@ -1075,10 +1083,12 @@ HeapWord* DefNewGeneration::allocate(size_t word_size,
   return result;
 }
 
+//分配内存
 HeapWord* DefNewGeneration::par_allocate(size_t word_size,
                                          bool is_tlab) {
   HeapWord* res = eden()->par_allocate(word_size);
-  if (CMSEdenChunksRecordAlways && _next_gen != NULL) {
+  //Always record eden chunks used for the parallel initial mark or or remark of eden
+  if (CMSEdenChunksRecordAlways && _next_gen != NULL) {//
     _next_gen->sample_eden_chunk();
   }
   return res;

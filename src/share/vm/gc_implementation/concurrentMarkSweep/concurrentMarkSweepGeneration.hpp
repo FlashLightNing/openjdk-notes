@@ -1196,12 +1196,15 @@ class ConcurrentMarkSweepGeneration: public CardGeneration {
   MemRegion used_region() const;
   MemRegion used_region_at_save_marks() const;
 
-  // Does a "full" (forced) collection invoked on this generation collect
-  // all younger generations as well? Note that the second conjunct is a
-  // hack to allow the collection of the younger gen first if the flag is
-  // set. This is better than using th policy's should_collect_gen0_first()
-  // since that causes us to do an extra unnecessary pair of restart-&-stop-world.
-  virtual bool full_collects_younger_generations() const {
+  /* Does a "full" (forced) collection invoked on this generation collect
+   all younger generations as well? Note that the second conjunct is a
+   hack to allow the collection of the younger gen first if the flag is
+   set. This is better than using th policy's should_collect_gen0_first()
+   since that causes us to do an extra unnecessary pair of restart-&-stop-world.
+   UseCMSCompactAtFullCollection 默认true
+   CollectGen0First 默认false
+  */
+   virtual bool full_collects_younger_generations() const {
     return UseCMSCompactAtFullCollection && !CollectGen0First;
   }
 

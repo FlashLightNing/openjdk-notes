@@ -96,6 +96,7 @@ static volatile int TryingToBlock = 0 ;    // proximate value -- for advisory us
 static bool timeout_error_printed = false;
 
 // Roll all threads forward to a safepoint and suspend them all
+//驱使所有线程进入safepoint然后挂起他们
 void SafepointSynchronize::begin() {
 
   Thread* myThread = Thread::current();
@@ -118,6 +119,7 @@ void SafepointSynchronize::begin() {
 
   // By getting the Threads_lock, we assure that no threads are about to start or
   // exit. It is released again in SafepointSynchronize::end().
+  //占用后，可以确保没有线程会启动或者退出。直到调用end，才会释放该锁
   Threads_lock->lock();
 
   assert( _state == _not_synchronized, "trying to safepoint synchronize with wrong state");
@@ -403,8 +405,10 @@ void SafepointSynchronize::begin() {
   }
 }
 
-// Wake up all threads, so they are ready to resume execution after the safepoint
-// operation has been carried out
+/* Wake up all threads, so they are ready to resume execution after the safepoint
+ operation has been carried out
+ 唤醒所有的线程，在safepoint执行之后，让这些线程重新恢复执行
+*/
 void SafepointSynchronize::end() {
 
   assert(Threads_lock->owned_by_self(), "must hold Threads_lock");

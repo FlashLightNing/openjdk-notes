@@ -1114,7 +1114,10 @@ instanceOop InstanceKlass::register_finalizer(instanceOop i, TRAPS) {
 }
 
 instanceOop InstanceKlass::allocate_instance(TRAPS) {
-  bool has_finalizer_flag = has_finalizer(); // Query before possible GC
+  /* Query before possible GC 检测对象是否实现了finalizer方法。
+  因为finalizer方法会在GC前触发，所以要在可能的GC前就查询一下该类是否覆盖了该方法
+  */
+  bool has_finalizer_flag = has_finalizer(); 
   int size = size_helper();  // Query before forming handle.
 
   KlassHandle h_k(THREAD, this);
@@ -1122,6 +1125,10 @@ instanceOop InstanceKlass::allocate_instance(TRAPS) {
   instanceOop i;
 
   i = (instanceOop)CollectedHeap::obj_allocate(h_k, size, CHECK_NULL);
+  /*RegisterFinalizersAtInit 默认true
+  Register finalizable objects at end of Object.<init> or "        \
+          "after allocation
+  */
   if (has_finalizer_flag && !RegisterFinalizersAtInit) {
     i = register_finalizer(i, CHECK_NULL);
   }

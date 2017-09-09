@@ -453,9 +453,11 @@ protected:
 
 class GenSpaceMangler;
 
-// A space in which the free area is contiguous.  It therefore supports
-// faster allocation, and compaction.
-class ContiguousSpace: public CompactibleSpace {
+/* A space in which the free area is contiguous.  It therefore supports
+ faster allocation, and compaction.
+ ContiguousSpace是一个空闲空间连续的space，所以它支持快速分配和压缩整理
+*/
+ class ContiguousSpace: public CompactibleSpace {
   friend class OneContigSpaceCardGeneration;
   friend class VMStructs;
  protected:
@@ -695,10 +697,13 @@ class EdenSpace : public ContiguousSpace {
  private:
   DefNewGeneration* _gen;
 
-  // _soft_end is used as a soft limit on allocation.  As soft limits are
-  // reached, the slow-path allocation code can invoke other actions and then
-  // adjust _soft_end up to a new soft limit or to end().
-  HeapWord* _soft_end;
+  /* _soft_end is used as a soft limit on allocation.  As soft limits are
+   reached, the slow-path allocation code can invoke other actions and then
+   adjust _soft_end up to a new soft limit or to end().
+   _soft_end被用于分配时的软限制。
+   当达到软限制，慢速分配路径会调用其他方法，增大_soft_end到新的软限制，直到最末尾。
+  */
+   HeapWord* _soft_end;
 
  public:
   EdenSpace(DefNewGeneration* gen) :

@@ -122,7 +122,10 @@ HeapWord* CollectedHeap::common_mem_allocate_noinit(KlassHandle klass, size_t si
   }
 
   HeapWord* result = NULL;
-  if (UseTLAB) {
+  if (UseTLAB) {//在tlab里分配
+/*
+封装了tlab不足时的情况，tlab空间不足会根据情况是浪费这块空间重新申请一块，或者就直接不在tlab分配了
+*/
     result = allocate_from_tlab(klass, THREAD, size);
     if (result != NULL) {
       assert(!HAS_PENDING_EXCEPTION,
@@ -131,6 +134,9 @@ HeapWord* CollectedHeap::common_mem_allocate_noinit(KlassHandle klass, size_t si
     }
   }
   bool gc_overhead_limit_was_exceeded = false;
+   /*
+    统一封装了分配，里面包含了分配不下时触发GC的情况
+   */
   result = Universe::heap()->mem_allocate(size,
                                           &gc_overhead_limit_was_exceeded);
   if (result != NULL) {
@@ -180,11 +186,15 @@ HeapWord* CollectedHeap::common_mem_allocate_init(KlassHandle klass, size_t size
 HeapWord* CollectedHeap::allocate_from_tlab(KlassHandle klass, Thread* thread, size_t size) {
   assert(UseTLAB, "should use UseTLAB");
 
+  //第一步：直接在线程的tlab上分配，若分配失败，则走相对慢的分配：allocate_from_tlab_slow
   HeapWord* obj = thread->tlab().allocate(size);
   if (obj != NULL) {
     return obj;
   }
-  // Otherwise...
+  /* Otherwise...
+  是指当直接在线程的tlab上分配不下的时候，线程重新申请一块tlab,然后在这块tlab上分配，并返回分配完的地址。
+  但如果剩余的空间>配置的可浪费的空间，则就不在tlab分配，而是去eden区分配
+  */
   return allocate_from_tlab_slow(klass, thread, size);
 }
 
@@ -195,7 +205,7 @@ void CollectedHeap::init_obj(HeapWord* obj, size_t size) {
   ((oop)obj)->set_klass_gap(0);
   Copy::fill_to_aligned_words(obj + hs, size - hs);
 }
-
+//分配
 oop CollectedHeap::obj_allocate(KlassHandle klass, int size, TRAPS) {
   debug_only(check_for_valid_allocation_state());
   assert(!Universe::heap()->is_gc_active(), "Allocation during gc not allowed");

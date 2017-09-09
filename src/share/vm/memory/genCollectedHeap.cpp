@@ -144,6 +144,7 @@ jint GenCollectedHeap::initialize() {
     _gens[i] = _gen_specs[i]->init(this_rs, i, rem_set());
     heap_rs = heap_rs.last_part(_gen_specs[i]->max_size());
   }
+  //初始化的时候先清空状态
   clear_incremental_collection_failed();
 
 #if INCLUDE_ALL_GCS
@@ -322,16 +323,19 @@ HeapWord* GenCollectedHeap::attempt_allocation(size_t size,
                                                bool first_only) {
   HeapWord* res;
   for (int i = 0; i < _n_gens; i++) {
-    if (_gens[i]->should_allocate(size, is_tlab)) {
+    if (_gens[i]->should_allocate(size, is_tlab)) {//在每个代尝试分配,主要是根据大小判断
       res = _gens[i]->allocate(size, is_tlab);
-      if (res != NULL) return res;
-      else if (first_only) break;
+      if (res != NULL)
+         return res;
+      else if (first_only) //默认都是true，所以只要年轻代分配不了，就直接break了
+        break;
     }
   }
   // Otherwise...
   return NULL;
 }
 
+//由collectedHeap.inline.hpp的common_mem_allocate_noinit方法调用，用于分配对象
 HeapWord* GenCollectedHeap::mem_allocate(size_t size,
                                          bool* gc_overhead_limit_was_exceeded) {
   return collector_policy()->mem_allocate_work(size,
@@ -367,7 +371,8 @@ void GenCollectedHeap::do_collection(bool  full,
   guarantee(!is_gc_active(), "collection is not reentrant");
   assert(max_level < n_gens(), "sanity check");
 
-  if (GC_locker::check_active_before_gc()) {
+  if (GC_locker::check_active_before_gc()) {//有线程在jni临界区，所以不GC
+    //参考文章https://www.ibm.com/support/knowledgecenter/zh/SSYKE2_7.0.0/com.ibm.java.aix.70.doc/diag/understanding/jni_copypin.html
     return; // GC is disabled (e.g. JNI GetXXXCritical operation)
   }
 
@@ -398,9 +403,11 @@ void GenCollectedHeap::do_collection(bool  full,
 
     int starting_level = 0;
     if (full) {
-      // Search for the oldest generation which will collect all younger
-      // generations, and start collection loop there.
-      for (int i = max_level; i >= 0; i--) {
+      /* Search for the oldest generation which will collect all younger
+       generations, and start collection loop there.
+       找到最老的一个分代，它会收集所有的年轻代，然后在这启动回收的循环
+      */
+       for (int i = max_level; i >= 0; i--) {
         if (_gens[i]->full_collects_younger_generations()) {
           starting_level = i;
           break;

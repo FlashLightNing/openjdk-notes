@@ -212,7 +212,7 @@ void VM_CMS_Final_Remark::doit() {
 
 /* VM operation to invoke a concurrent collection of a
  GenCollectedHeap heap.
-VM 操作，调用一次并发收集
+VM 操作，调用一次FULLGC 并发收集,会由system.gc调用
 */
 void VM_GenCollectFullConcurrent::doit() {
   assert(Thread::current()->is_VM_thread(), "Should be VM thread");

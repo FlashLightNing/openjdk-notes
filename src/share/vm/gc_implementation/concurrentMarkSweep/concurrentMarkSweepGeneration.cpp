@@ -899,7 +899,7 @@ size_t ConcurrentMarkSweepGeneration::max_available() const {
 判断担保是否安全
 1.得到剩余可用的堆大小
 2.得到平均的晋升大小
-判断  可用的>平均的晋升大小 或者可用的>最大的晋升大小
+判断  可用的>平均的晋升大小 或者可用的>最大的晋升大小（即eden+from已使用的大小）
 */
 bool ConcurrentMarkSweepGeneration::promotion_attempt_is_safe(size_t max_promotion_in_bytes) const {
   size_t available = max_available();
@@ -1748,11 +1748,18 @@ void ConcurrentMarkSweepGeneration::collect(bool   full,
   collector()->collect(full, clear_all_soft_refs, size, tlab);
 }
 
+/*
+根据full 判断是否是full gc
+*/
 void CMSCollector::collect(bool   full,
                            bool   clear_all_soft_refs,
                            size_t size,
                            bool   tlab)
 {
+  /*
+  UseCMSCollectionPassing
+  Use passing of collection from background to foreground 默认true
+  */
   if (!UseCMSCollectionPassing && _collectorState > Idling) {
     // For debugging purposes skip the collection if the state
     // is not currently idle
@@ -1824,73 +1831,75 @@ void CMSCollector::report_concurrent_mode_interruption() {
 }
 
 
-// The foreground and background collectors need to coordinate in order
-// to make sure that they do not mutually interfere with CMS collections.
-// When a background collection is active,
-// the foreground collector may need to take over (preempt) and
-// synchronously complete an ongoing collection. Depending on the
-// frequency of the background collections and the heap usage
-// of the application, this preemption can be seldom or frequent.
-// There are only certain
-// points in the background collection that the "collection-baton"
-// can be passed to the foreground collector.
-//只有确定的几种情况下，background回收会被foreground接替
-// The foreground collector will wait for the baton before
-// starting any part of the collection.  The foreground collector
-// will only wait at one location.
-//
-// The background collector will yield the baton before starting a new
-// phase of the collection (e.g., before initial marking, marking from roots,
-// precleaning, final re-mark, sweep etc.)  This is normally done at the head
-// of the loop which switches the phases. The background collector does some
-// of the phases (initial mark, final re-mark) with the world stopped.
-// Because of locking involved in stopping the world,
-// the foreground collector should not block waiting for the background
-// collector when it is doing a stop-the-world phase.  The background
-// collector will yield the baton at an additional point just before
-// it enters a stop-the-world phase.  Once the world is stopped, the
-// background collector checks the phase of the collection.  If the
-// phase has not changed, it proceeds with the collection.  If the
-// phase has changed, it skips that phase of the collection.  See
-// the comments on the use of the Heap_lock in collect_in_background().
-//
-// Variable used in baton passing.
-//   _foregroundGCIsActive - Set to true by the foreground collector when
-//      it wants the baton.  The foreground clears it when it has finished
-//      the collection.
-//   _foregroundGCShouldWait - Set to true by the background collector
-//        when it is running.  The foreground collector waits while
-//      _foregroundGCShouldWait is true.
-//  CGC_lock - monitor used to protect access to the above variables
-//      and to notify the foreground and background collectors.
-//  _collectorState - current state of the CMS collection.
-//
-// The foreground collector
-//   acquires the CGC_lock
-//   sets _foregroundGCIsActive
-//   waits on the CGC_lock for _foregroundGCShouldWait to be false
-//     various locks acquired in preparation for the collection
-//     are released so as not to block the background collector
-//     that is in the midst of a collection
-//   proceeds with the collection
-//   clears _foregroundGCIsActive
-//   returns
-//
-// The background collector in a loop iterating on the phases of the
-//      collection
-//   acquires the CGC_lock
-//   sets _foregroundGCShouldWait
-//   if _foregroundGCIsActive is set
-//     clears _foregroundGCShouldWait, notifies _CGC_lock
-//     waits on _CGC_lock for _foregroundGCIsActive to become false
-//     and exits the loop.
-//   otherwise
-//     proceed with that phase of the collection
-//     if the phase is a stop-the-world phase,
-//       yield the baton once more just before enqueueing
-//       the stop-world CMS operation (executed by the VM thread).
-//   returns after all phases of the collection are done
-//
+/* The foreground and background collectors need to coordinate in order
+ to make sure that they do not mutually interfere with CMS collections.
+ When a background collection is active,
+ the foreground collector may need to take over (preempt) and
+ synchronously complete an ongoing collection. Depending on the
+ frequency of the background collections and the heap usage
+ of the application, this preemption can be seldom or frequent.
+ There are only certain
+ points in the background collection that the "collection-baton"
+ can be passed to the foreground collector.
+只有确定的几种情况下，background回收会被foreground接替
+ The foreground collector will wait for the baton before
+ starting any part of the collection.  The foreground collector
+ will only wait at one location.
+
+ The background collector will yield the baton before starting a new
+ phase of the collection (e.g., before initial marking, marking from roots,
+ precleaning, final re-mark, sweep etc.)  This is normally done at the head
+ of the loop which switches the phases. The background collector does some
+ of the phases (initial mark, final re-mark) with the world stopped.
+ Because of locking involved in stopping the world,
+ the foreground collector should not block waiting for the background
+ collector when it is doing a stop-the-world phase.  The background
+ collector will yield the baton at an additional point just before
+ it enters a stop-the-world phase.  Once the world is stopped, the
+ background collector checks the phase of the collection.  If the
+ phase has not changed, it proceeds with the collection.  If the
+ phase has changed, it skips that phase of the collection.  See
+ the comments on the use of the Heap_lock in collect_in_background().
+
+ Variable used in baton passing. 在交接接力棒中使用的变量
+   _foregroundGCIsActive - Set to true by the foreground collector when
+      it wants the baton.  The foreground clears it when it has finished
+      the collection.
+   _foregroundGCShouldWait - Set to true by the background collector
+        when it is running.  The foreground collector waits while
+      _foregroundGCShouldWait is true.
+  CGC_lock - monitor used to protect access to the above variables
+      and to notify the foreground and background collectors.
+  _collectorState - current state of the CMS collection.
+
+ The foreground collector
+   acquires the CGC_lock
+   sets _foregroundGCIsActive
+   waits on the CGC_lock for _foregroundGCShouldWait to be false
+     various locks acquired in preparation for the collection
+     are released so as not to block the background collector
+     that is in the midst of a collection
+   proceeds with the collection
+   clears _foregroundGCIsActive
+   returns
+
+ The background collector in a loop iterating on the phases of the
+      collection
+   acquires the CGC_lock
+   sets _foregroundGCShouldWait
+   if _foregroundGCIsActive is set
+     clears _foregroundGCShouldWait, notifies _CGC_lock
+     waits on _CGC_lock for _foregroundGCIsActive to become false
+     and exits the loop.
+   otherwise
+     proceed with that phase of the collection
+     if the phase is a stop-the-world phase,
+       yield the baton once more just before enqueueing
+       the stop-world CMS operation (executed by the VM thread).
+   returns after all phases of the collection are done
+
+   此方法名的寓意是：从background gc处获取GC控制权并进行foreground gc
+*/
 
 void CMSCollector::acquire_control_and_collect(bool full,
         bool clear_all_soft_refs) {
@@ -2002,7 +2011,7 @@ NOT_PRODUCT(
       save_heap_summary();
     }
 
-    do_compaction_work(clear_all_soft_refs);
+    do_compaction_work(clear_all_soft_refs);//做标记-清除-整理工作
 
     // Has the GC time limit been exceeded?
     DefNewGeneration* young_gen = _young_gen->as_DefNewGeneration();
@@ -2020,7 +2029,7 @@ NOT_PRODUCT(
                                            gch->collector_policy());
   } else {
     do_mark_sweep_work(clear_all_soft_refs, first_state,
-      should_start_over);//foreground式的
+      should_start_over);//foreground式的，只做标记清除工作
   }
   // Reset the expansion cause, now that we just completed
   // a collection cycle.
@@ -2058,7 +2067,7 @@ void CMSCollector::decide_foreground_collection_type(
    has exceeded the threshold set by CMSFullGCsBeforeCompaction,
    or if an incremental collection has failed
    正常来讲，如果设置了UseCMSCompactAtFullCollection，我们就会进行压缩整理。
-   而且要么是这次请求是system.gc，要么就是full gc的次数已经超过了CMSFullGCsBeforeCompaction设置的阈值
+   或者要么是这次请求是system.gc，要么就是full gc的次数已经超过了CMSFullGCsBeforeCompaction设置的阈值
    或者也可能是一次增量式的回收失败了
   */
   GenCollectedHeap* gch = GenCollectedHeap::heap();
@@ -2225,7 +2234,7 @@ void CMSCollector::do_compaction_work(bool clear_all_soft_refs) {
 /* A work method used by the foreground collector to do a mark-sweep, 
 after taking over from a possibly on-going concurrent mark-sweep collection.
 
-在接管可能正在运行的并发标记-清除回收之后，调用的是foreground式的GC。
+在接管可能正在运行的background式的并发标记-清除回收之后，调用的是foreground式的GC。
 */
 void CMSCollector::do_mark_sweep_work(bool clear_all_soft_refs,
   CollectorState first_state, bool should_start_over) {
@@ -2652,6 +2661,8 @@ foreground CMS GC只有以下几个阶段：
 InitialMarking
 Marking
 FinalMarking
+Sweeping-->会清除增量式回收失败的那个状态位
+Resetting
 */
 void CMSCollector::collect_in_foreground(bool clear_all_soft_refs, GCCause::Cause cause) {
   assert(_foregroundGCIsActive && !_foregroundGCShouldWait,
@@ -6659,13 +6670,14 @@ void CMSCollector::sweep(bool asynch) {
   assert(_collectorState == Resizing, "Change of collector state to"
     " Resizing must be done under the freelistLocks (plural)");
 
-  // Now that sweeping has been completed, we clear
-  // the incremental_collection_failed flag,
-  // thus inviting a younger gen collection to promote into
-  // this generation. If such a promotion may still fail,
-  // the flag will be set again when a young collection is
-  // attempted.
-  GenCollectedHeap* gch = GenCollectedHeap::heap();
+  /* Now that sweeping has been completed, we clear
+   the incremental_collection_failed flag,
+   thus inviting a younger gen collection to promote into
+   this generation. If such a promotion may still fail,
+   the flag will be set again when a young collection is
+   attempted.
+  */
+   GenCollectedHeap* gch = GenCollectedHeap::heap();
   gch->clear_incremental_collection_failed();  // Worth retrying as fresh space may have been freed up
   gch->update_full_collections_completed(_collection_count_start);
 }
@@ -6765,6 +6777,9 @@ void CMSCollector::sweepWork(ConcurrentMarkSweepGeneration* gen,
 
   // check that we hold the requisite locks
   assert(have_cms_token(), "Should hold cms token");
+  /*asynch=true表示异步，则肯定是cms线程处理
+  asynch=false表示是full gc，则肯定需要vm线程来处理
+  */
   assert(   (asynch && ConcurrentMarkSweepThread::cms_thread_has_cms_token())
          || (!asynch && ConcurrentMarkSweepThread::vm_thread_has_cms_token()),
         "Should possess CMS token to sweep");

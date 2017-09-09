@@ -221,6 +221,7 @@ void ParScanThreadState::push_on_overflow_stack(oop p) {
   assert(young_gen()->overflow_list() == NULL, "Error");
 }
 
+
 HeapWord* ParScanThreadState::alloc_in_to_space_slow(size_t word_sz) {
 
   // Otherwise, if the object is small enough, try to reallocate the
@@ -911,6 +912,8 @@ void ParNewGeneration::handle_promotion_failed(GenCollectedHeap* gch, ParScanThr
   NOT_PRODUCT(Universe::heap()->reset_promotion_should_fail();)
 }
 
+
+  
 void ParNewGeneration::collect(bool   full,
                                bool   clear_all_soft_refs,
                                size_t size,
@@ -939,10 +942,15 @@ void ParNewGeneration::collect(bool   full,
     set_avoid_promotion_undo(true);
   }
 
-  // If the next generation is too full to accommodate worst-case promotion
-  // from this generation, pass on collection; let the next generation
-  // do it.
-  //如果老年代太满了，以至于最坏情况下都不能保证从年轻代晋升，就传递给老年代去处理
+  /* If the next generation is too full to accommodate worst-case promotion
+   from this generation, pass on collection; let the next generation
+   do it.
+  如果老年代太满了，以至于最坏情况下都不能保证从年轻代晋升，就传递给老年代去处理
+  在内存分配的代码中，如果incremental_collection_failed=true，就会在内存不足触发的GC时使用full gc进行回收
+  所以这里的注释的意思是：我们甚至没有发起一次gc。因为这次由内存分配不足引发的young GC是不安全的，所以等下次内存分配的时候
+  使用full gc进行回收。
+  参考satisfy_failed_allocation
+  */
   if (!collection_attempt_is_safe()) {
     gch->set_incremental_collection_failed();  // slight lie, in that we did not even attempt one
     return;

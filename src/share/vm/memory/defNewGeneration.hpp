@@ -266,6 +266,7 @@ protected:
 
     const bool non_zero      = word_size > 0;
     const bool overflows     = word_size >= overflow_limit;
+    //_pretenure_size_threshold_words表示允许defNew分配的最大大小的对象
     const bool check_too_big = _pretenure_size_threshold_words > 0;
     const bool not_too_big   = word_size < _pretenure_size_threshold_words;
     const bool size_ok       = is_tlab || !check_too_big || not_too_big;

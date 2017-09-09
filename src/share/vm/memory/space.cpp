@@ -703,18 +703,23 @@ inline HeapWord* ContiguousSpace::allocate_impl(size_t size,
 inline HeapWord* ContiguousSpace::par_allocate_impl(size_t size,
                                                     HeapWord* const end_value) {
   do {
-    HeapWord* obj = top();
+    HeapWord* obj = top();//分配的顶指针，旧值
+    //指针碰撞，end_value表示是eden区的末尾，obj表示当前被分配的顶部指针，>size表示有空闲
     if (pointer_delta(end_value, obj) >= size) {
       HeapWord* new_top = obj + size;
       HeapWord* result = (HeapWord*)Atomic::cmpxchg_ptr(new_top, top_addr(), obj);
-      // result can be one of two:
-      //  the old top value: the exchange succeeded
-      //  otherwise: the new value of the top is returned.
-      if (result == obj) {
+      /* result can be one of two:
+        the old top value: the exchange succeeded
+        otherwise: the new value of the top is returned.
+        返回值只能有2种：
+        如果返回了旧值，就表示替换成功
+        否则返回的是顶部的新值
+        */
+        if (result == obj) {
         assert(is_aligned(obj) && is_aligned(new_top), "checking alignment");
         return obj;
       }
-    } else {
+    } else {//eden区没有连续空间
       return NULL;
     }
   } while (true);

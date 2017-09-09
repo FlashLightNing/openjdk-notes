@@ -152,26 +152,29 @@ IRT_ENTRY(void, InterpreterRuntime::_new(JavaThread* thread, ConstantPool* pool,
   instanceKlassHandle klass (THREAD, k_oop);
 
   // Make sure we are not instantiating an abstract klass
+  //确保我们不会实例化一个抽象类
   klass->check_valid_for_instantiation(true, CHECK);
 
   // Make sure klass is initialized
+  //确保已经被初始化了
   klass->initialize(CHECK);
 
-  // At this point the class may not be fully initialized
-  // because of recursive initialization. If it is fully
-  // initialized & has_finalized is not set, we rewrite
-  // it into its fast version (Note: no locking is needed
-  // here since this is an atomic byte write and can be
-  // done more than once).
-  //
-  // Note: In case of classes with has_finalized we don't
-  //       rewrite since that saves us an extra check in
-  //       the fast version which then would call the
-  //       slow version anyway (and do a call back into
-  //       Java).
-  //       If we have a breakpoint, then we don't rewrite
-  //       because the _breakpoint bytecode would be lost.
-  oop obj = klass->allocate_instance(CHECK);
+  /* At this point the class may not be fully initialized
+   because of recursive initialization. If it is fully
+   initialized & has_finalized is not set, we rewrite
+   it into its fast version (Note: no locking is needed
+   here since this is an atomic byte write and can be
+   done more than once).
+  
+   Note: In case of classes with has_finalized we don't
+         rewrite since that saves us an extra check in
+         the fast version which then would call the
+         slow version anyway (and do a call back into
+         Java).
+         If we have a breakpoint, then we don't rewrite
+         because the _breakpoint bytecode would be lost.
+  */
+         oop obj = klass->allocate_instance(CHECK);
   thread->set_vm_result(obj);
 IRT_END
 

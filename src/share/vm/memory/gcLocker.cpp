@@ -38,11 +38,12 @@ volatile jint GC_locker::_debug_jni_lock_count = 0;
 
 
 #ifdef ASSERT
-void GC_locker::verify_critical_count() {
+void GC_locker::verify_critical_count() {//校验临界区的线程的数量
   if (SafepointSynchronize::is_at_safepoint()) {
     assert(!needs_gc() || _debug_jni_lock_count == _jni_lock_count, "must agree");
     int count = 0;
     // Count the number of threads with critical operations in progress
+    //计算正在临界区的线程的数量
     for (JavaThread* thr = Threads::first(); thr; thr = thr->next()) {
       if (thr->in_critical()) {
         count++;
@@ -61,8 +62,15 @@ void GC_locker::verify_critical_count() {
 }
 #endif
 
+/*只有在这，_needs_gc才会成为true
+check_active_before_gc()该方法会在具体的进行GC的的代码中调用，从而达到了设置_needs_gc的目的
+该方法意为在GC前检查，所以在具体GC处肯定会调用
+如果有jni在操作，则is_active返回TRUE，那么该方法最终返回true给GC调用处，
+而在GC调用处，如果该方法返回TRUE，就不进行GC了。因为可能有一些jni正在操作
+*/
 bool GC_locker::check_active_before_gc() {
   assert(SafepointSynchronize::is_at_safepoint(), "only read at safepoint");
+  //_needs_gc一开始是false，is_active什么时候变成true呢？_jni_lock_count>0的时候就会返回true
   if (is_active() && !_needs_gc) {
     verify_critical_count();
     _needs_gc = true;
@@ -94,22 +102,26 @@ void GC_locker::stall_until_clear() {
   }
 }
 
-void GC_locker::jni_lock(JavaThread* thread) {
+void GC_locker::jni_lock(JavaThread* thread) {//进入临界区前占有该锁
   assert(!thread->in_critical(), "shouldn't currently be in a critical region");
   MutexLocker mu(JNICritical_lock);
-  // Block entering threads if we know at least one thread is in a
-  // JNI critical region and we need a GC.
-  // We check that at least one thread is in a critical region before
-  // blocking because blocked threads are woken up by a thread exiting
-  // a JNI critical region.
-  while (is_active_and_needs_gc() || _doing_gc) {
+  /* Block entering threads if we know at least one thread is in a
+   JNI critical region and we need a GC.
+   We check that at least one thread is in a critical region before
+   blocking because blocked threads are woken up by a thread exiting
+   a JNI critical region.
+   如果我们知道至少一个线程在JNI临界区代码，而且我们需要GC，那么就阻塞将要进入的线程
+   在阻塞的线程被 退出临界区的线程唤醒之前，我们会核对至少一个线程在临界区。
+  */
+   while (is_active_and_needs_gc() || _doing_gc) {
     JNICritical_lock->wait();
   }
   thread->enter_critical();
-  _jni_lock_count++;
+  _jni_lock_count++;//进入临界区要加+1，用于统计
   increment_debug_jni_lock_count();
 }
 
+//退出临界区后释放该锁
 void GC_locker::jni_unlock(JavaThread* thread) {
   assert(thread->in_last_critical(), "should be exiting critical region");
   MutexLocker mu(JNICritical_lock);

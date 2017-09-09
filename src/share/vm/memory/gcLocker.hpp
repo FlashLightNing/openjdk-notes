@@ -48,12 +48,15 @@
 
 class GC_locker: public AllStatic {
  private:
-  // The _jni_lock_count keeps track of the number of threads that are
-  // currently in a critical region.  It's only kept up to date when
-  // _needs_gc is true.  The current value is computed during
-  // safepointing and decremented during the slow path of GC_locker
-  // unlocking.
-  static volatile jint _jni_lock_count;  // number of jni active instances.
+  /* The _jni_lock_count keeps track of the number of threads that are
+   currently in a critical region.  It's only kept up to date when
+   _needs_gc is true.  The current value is computed during
+   safepointing and decremented during the slow path of GC_locker unlocking.
+   _jni_lock_count的数值就是当前在临界区的线程的数量。
+   只有当_needs_gc=true时它才是最新的值。
+   当前值是在safepoint计算出来的，而且在gc_locker解锁的慢路径中减少
+  */
+   static volatile jint _jni_lock_count;  // number of jni active instances.
   static volatile bool _needs_gc;        // heap is filling, we need a GC
                                          // note: bool is typedef'd as jint
   static volatile bool _doing_gc;        // unlock_critical() is doing a GC
@@ -64,10 +67,13 @@ class GC_locker: public AllStatic {
   static volatile jint _debug_jni_lock_count;
 #endif
 
-  // At a safepoint, visit all threads and count the number of active
-  // critical sections.  This is used to ensure that all active
-  // critical sections are exited before a new one is started.
-  static void verify_critical_count() NOT_DEBUG_RETURN;
+  /* At a safepoint, visit all threads and count the number of active
+   critical sections.  This is used to ensure that all active
+   critical sections are exited before a new one is started.
+   在安全点，查看所有线程然后统计活跃的临界区代码的数量。
+   这个是为了确保在开启一次新GC前所有线程都已经退了临界区。
+  */
+   static void verify_critical_count() NOT_DEBUG_RETURN;
 
   static void jni_lock(JavaThread* thread);
   static void jni_unlock(JavaThread* thread);
@@ -87,10 +93,15 @@ class GC_locker: public AllStatic {
 
   // Shorthand
   static bool is_active_and_needs_gc() {
-    // Use is_active_internal since _needs_gc can change from true to
-    // false outside of a safepoint, triggering the assert in
-    // is_active.
-    return needs_gc() && is_active_internal();
+    /* Use is_active_internal since _needs_gc can change from true to false 
+    outside of a safepoint, triggering the assert in
+     is_active.
+     is_active_internal是因为_needs_gc会由true变成false
+     needs_gc只有在这 GC_locker::check_active_before_gc() 才会变成true
+     needs_gc只有被需要GC的时候才会在collection方法里面设置为TRUE
+     is_active_internal=true的时候表示有jni在操作
+    */
+     return needs_gc() && is_active_internal();
   }
 
   // In debug mode track the locking state at all times

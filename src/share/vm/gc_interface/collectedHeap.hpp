@@ -34,11 +34,13 @@
 #include "runtime/safepoint.hpp"
 #include "utilities/events.hpp"
 
-// A "CollectedHeap" is an implementation of a java heap for HotSpot.  This
-// is an abstract class: there may be many different kinds of heaps.  This
-// class defines the functions that a heap must implement, and contains
-// infrastructure common to all heaps.
-
+/* A "CollectedHeap" is an implementation of a java heap for HotSpot.  This
+ is an abstract class: there may be many different kinds of heaps.  This
+ class defines the functions that a heap must implement, and contains
+ infrastructure common to all heaps.
+ CollectedHeap是hotspot的java堆的一种实现。该类是一个抽象类。也许会有许多不同类型的堆
+ 该类定义了一个堆必须实现的方法，同时也保持了对所有堆都公共的方法。
+*/
 class AdaptiveSizePolicy;
 class BarrierSet;
 class CollectorPolicy;

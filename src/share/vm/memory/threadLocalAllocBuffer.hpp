@@ -66,8 +66,9 @@ private:
   void set_top(HeapWord* top)                    { _top = top; }
   void set_pf_top(HeapWord* pf_top)              { _pf_top = pf_top; }
   void set_desired_size(size_t desired_size)     { _desired_size = desired_size; }
-  void set_refill_waste_limit(size_t waste)      { _refill_waste_limit = waste;  }
+  void set_refill_waste_limit(size_t waste)      { _refill_waste_limit = waste;  }//可忽略大小
 
+  //TLABRefillWasteFraction 默认值64
   size_t initial_refill_waste_limit()            { return desired_size() / TLABRefillWasteFraction; }
 
   static int    target_refills()                 { return _target_refills; }

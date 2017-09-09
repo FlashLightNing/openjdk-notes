@@ -138,14 +138,20 @@ class VM_Operation: public CHeapObj<mtInternal> {
   // Called by VM thread - does in turn invoke doit(). Do not override this
   void evaluate();
 
-  // evaluate() is called by the VMThread and in turn calls doit().
-  // If the thread invoking VMThread::execute((VM_Operation*) is a JavaThread,
-  // doit_prologue() is called in that thread before transferring control to
-  // the VMThread.
-  // If doit_prologue() returns true the VM operation will proceed, and
-  // doit_epilogue() will be called by the JavaThread once the VM operation
-  // completes. If doit_prologue() returns false the VM operation is cancelled.
-  virtual void doit()                            = 0;
+  /* evaluate() is called by the VMThread and in turn calls doit().
+   If the thread invoking VMThread::execute((VM_Operation*) is a JavaThread,
+   doit_prologue() is called in that thread before transferring control to
+   the VMThread.
+   If doit_prologue() returns true the VM operation will proceed, and
+   doit_epilogue() will be called by the JavaThread once the VM operation
+   completes. If doit_prologue() returns false the VM operation is cancelled.
+   evaluate由VM线程调用，最终是调用的doit()方法。
+   如果调用VM线程的execute((VM_Operation*)的是java线程，在将控制权交给VM线程之前，doit_prologue会被调用
+   doit_prologue 返回true，那么vm操作就会继续。
+   doit_epilogue一旦在VM操作结束的时候，就会由java线程调用.
+   如果doit_prologue返回false，VM操作就会取消
+  */
+   virtual void doit()                            = 0;
   virtual bool doit_prologue()                   { return true; };
   virtual void doit_epilogue()                   {}; // Note: Not called if mode is: _concurrent
 
@@ -160,6 +166,7 @@ class VM_Operation: public CHeapObj<mtInternal> {
 
   // Configuration. Override these appropriatly in subclasses.
   virtual VMOp_Type type() const = 0;
+  //判断该opertaion是否是safepoint
   virtual Mode evaluation_mode() const            { return _safepoint; }
   virtual bool allow_nested_vm_operations() const { return false; }
   virtual bool is_cheap_allocated() const         { return false; }
@@ -212,7 +219,7 @@ class VM_ThreadStop: public VM_Operation {
   void doit();
   // We deoptimize if top-most frame is compiled - this might require a C2I adapter to be generated
   bool allow_nested_vm_operations() const        { return true; }
-  Mode evaluation_mode() const                   { return _async_safepoint; }
+  Mode evaluation_mode() const                   { return _async_safepoint; }//非阻塞_安全点
   bool is_cheap_allocated() const                { return true; }
 
   // GC support

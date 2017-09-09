@@ -4282,6 +4282,13 @@ HOTSPOT_JNI_RELEASEPRIMITIVEARRAYCRITICAL_RETURN(
 JNI_END
 
 
+/*
+GetStringCritical得到的是一个指向JVM内部字符串的直接指针，
+获取这个直接指针后会导致暂停GC线程，当GC被暂停后，如果其它线程触发GC继续运行的话，都会导致阻塞调用者
+http://docs.oracle.com/javase/7/docs/technotes/guides/jni/spec/functions.html
+http://blog.csdn.net/xyang81/article/details/42066665
+https://www.ibm.com/support/knowledgecenter/zh/SSYKE2_7.0.0/com.ibm.java.aix.70.doc/diag/understanding/jni_copypin.html
+*/
 JNI_ENTRY(const jchar*, jni_GetStringCritical(JNIEnv *env, jstring string, jboolean *isCopy))
   JNIWrapper("GetStringCritical");
 #ifndef USDT2

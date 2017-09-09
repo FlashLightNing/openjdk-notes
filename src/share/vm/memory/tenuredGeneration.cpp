@@ -288,7 +288,7 @@ void TenuredGeneration::verify_alloc_buffers_clean() {}
 
 bool TenuredGeneration::promotion_attempt_is_safe(size_t max_promotion_in_bytes) const {
   size_t available = max_contiguous_available();//最大连续可用空间
-  size_t av_promo  = (size_t)gc_stats()->avg_promoted()->padded_average();
+  size_t av_promo  = (size_t)gc_stats()->avg_promoted()->padded_average();//平均晋升大小
   bool   res = (available >= av_promo) || (available >= max_promotion_in_bytes);
   if (PrintGC && Verbose) {
     gclog_or_tty->print_cr(

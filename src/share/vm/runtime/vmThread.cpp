@@ -177,9 +177,11 @@ bool VMOperationQueue::add(VM_Operation *op) {
 }
 
 VM_Operation* VMOperationQueue::remove_next() {
-  // Assuming VMOperation queue is two-level priority queue. If there are
-  // more than two priorities, we need a different scheduling algorithm.
-  assert(SafepointPriority == 0 && MediumPriority == 1 && nof_priorities == 2,
+  /* Assuming VMOperation queue is two-level priority queue. If there are
+   more than two priorities, we need a different scheduling algorithm.
+  假设vm操作队列是一个2级的优先队列。如果优先级的数量>2，我们需要不同的调度算法
+  */
+   assert(SafepointPriority == 0 && MediumPriority == 1 && nof_priorities == 2,
          "current algorithm does not work");
 
   // simple counter based scheduling to prevent starvation of lower priority
@@ -474,11 +476,13 @@ void VMThread::loop() {
           #endif
           SafepointSynchronize::end();
         }
-        _cur_vm_operation = _vm_queue->remove_next();
+        _cur_vm_operation = _vm_queue->remove_next();//取出队列中下一个vm operation
 
-        // If we are at a safepoint we will evaluate all the operations that
-        // follow that also require a safepoint
-        if (_cur_vm_operation != NULL &&
+        /* If we are at a safepoint we will evaluate all the operations that
+         follow that also require a safepoint
+         如果此次operation需要safepoint，那么，如果排在后面的operation都需要safepoint,这些操作就会一起处理
+        */
+         if (_cur_vm_operation != NULL &&
             _cur_vm_operation->evaluate_at_safepoint()) {
           safepoint_ops = _vm_queue->drain_at_safepoint_priority();
         }
@@ -679,10 +683,10 @@ void VMThread::execute(VM_Operation* op) {
     _cur_vm_operation = op;
 
     if (op->evaluate_at_safepoint() && !SafepointSynchronize::is_at_safepoint()) {
-      SafepointSynchronize::begin();
-      op->evaluate();
-      SafepointSynchronize::end();
-    } else {
+      SafepointSynchronize::begin();//驱使所有线程进入safepoint然后挂起他们
+      op->evaluate();//调用vm_operation的doit()方法进行回收。
+      SafepointSynchronize::end();//唤醒所有的线程，在safepoint执行之后，让这些线程重新恢复执行
+    } else {//如果已经在全局安全点，则可以操作vm操作了。
       op->evaluate();
     }
 

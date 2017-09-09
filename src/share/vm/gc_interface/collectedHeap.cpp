@@ -212,9 +212,11 @@ void CollectedHeap::collect_as_vm_thread(GCCause::Cause cause) {
 }
 
 void CollectedHeap::pre_initialize() {
-  // Used for ReduceInitialCardMarks (when COMPILER2 is used);
-  // otherwise remains unused.
-#ifdef COMPILER2
+  /* Used for ReduceInitialCardMarks (when COMPILER2 is used);
+   otherwise remains unused.
+   如果打开了COMPILER2参数，用于ReduceInitialCardMarks
+*/
+   #ifdef COMPILER2
   _defer_initial_card_mark =    ReduceInitialCardMarks && can_elide_tlab_store_barriers()
                              && (DeferInitialCardMark || card_mark_must_follow_store());
 #else
@@ -266,15 +268,19 @@ void CollectedHeap::check_for_valid_allocation_state() {
 */
 HeapWord* CollectedHeap::allocate_from_tlab_slow(KlassHandle klass, Thread* thread, size_t size) {
 
-  // Retain tlab and allocate object in shared space if
-  // the amount free in the tlab is too large to discard.
-  if (thread->tlab().free() > thread->tlab().refill_waste_limit()) {
+  /* Retain tlab and allocate object in shared space if
+   the amount free in the tlab is too large to discard.
+  如果在tlab上的空闲空间很大，以至于不能忽略，那就分配对象在shared space，保留该tlab
+  */
+   if (thread->tlab().free() > thread->tlab().refill_waste_limit()) {
     thread->tlab().record_slow_allocation(size);
     return NULL;
   }
 
-  // Discard tlab and allocate a new one.
-  // To minimize fragmentation, the last TLAB may be smaller than the rest.
+  /* Discard tlab and allocate a new one.
+   To minimize fragmentation, the last TLAB may be smaller than the rest.
+   忽略此tlab然后重新申请一块。为了最小化内存碎片，最后一个tlab可能比其他的都小
+  */
   size_t new_tlab_size = thread->tlab().compute_size(size);
 
   thread->tlab().clear_before_allocation();

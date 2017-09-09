@@ -193,7 +193,8 @@ void VM_GenCollectForAllocation::doit() {
 
   GenCollectedHeap* gch = GenCollectedHeap::heap();
   GCCauseSetter gccs(gch, _gc_cause);
-  _res = gch->satisfy_failed_allocation(_size, _tlab);
+  //通知内存堆管理器处理一次内存分配失败  
+  _res = gch->satisfy_failed_allocation(_size, _tlab);//res=分配的结果
   assert(gch->is_in_reserved_or_null(_res), "result not in heap");
 
   if (_res == NULL && GC_locker::is_active_and_needs_gc()) {

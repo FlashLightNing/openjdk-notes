@@ -38,15 +38,15 @@
 class VMOperationQueue : public CHeapObj<mtInternal> {
  private:
   enum Priorities {
-     SafepointPriority, // Highest priority (operation executed at a safepoint)
-     MediumPriority,    // Medium priority
-     nof_priorities
+     SafepointPriority, //0  Highest priority (operation executed at a safepoint) 高优（在safepoint下才能执行的操作）
+     MediumPriority,    //1  Medium priority
+     nof_priorities     //2
   };
 
   // We maintain a doubled linked list, with explicit count.
   /*
   准确的说，是数组+链表，跟map的结构有点像，不同链表是不同的优先级的VM操作
-  如果Priorities枚举类中的优先级分别是0,1,2的话，
+  Priorities枚举类中的优先级分别是0,1,2的话，
   _queue[0],_queue[1],_queue[2]就是3个链表，存着不同优先级的操作
   */
   int           _queue_length[nof_priorities];
@@ -94,7 +94,7 @@ class VMOperationQueue : public CHeapObj<mtInternal> {
  and is itself used by other threads to offload heavy vm operations
  like scavenge, garbage_collect etc.
 一个单线程（最开始的线程）产生了所有其他的线程，而且这个线程被其他线程用于
-分流重的VM操作，比如清扫，垃圾回收等
+分流比较繁重的VM操作，比如清扫，垃圾回收等
 */
 
 class VMThread: public NamedThread {

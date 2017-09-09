@@ -37,6 +37,9 @@ class CopyFailedInfo : public CHeapObj<mtGC> {
  public:
   CopyFailedInfo() : _first_size(0), _smallest_size(0), _total_size(0), _count(0) {}
 
+  /*
+  处理晋升失败的次数
+  */
   virtual void register_copy_failure(size_t size) {
     if (_first_size == 0) {
       _first_size = size;

@@ -56,6 +56,7 @@
 //   - this operation is invoked when allocation is failed;
 //     operation performs garbage collection and tries to
 //     allocate afterwards;
+// 这2中VM操作在内存分配失败的时候。这2个操作会垃圾回收，然后在回收之后再次分配
 //
 //  VM_GenCollectFull
 //  VM_GenCollectFullConcurrent

@@ -647,51 +647,63 @@ HeapWord* GenCollectorPolicy::mem_allocate_work(size_t size,
   debug_only(gch->check_for_valid_allocation_state());
   assert(gch->no_gc_in_progress(), "Allocation during gc not allowed");
 
-  // In general gc_overhead_limit_was_exceeded should be false so
-  // set it so here and reset it to true only if the gc time
-  // limit is being exceeded as checked below.
-  *gc_overhead_limit_was_exceeded = false;
+  /* In general gc_overhead_limit_was_exceeded should be false so
+   set it so here and reset it to true only if the gc time
+   limit is being exceeded as checked below.
+   一般来说，gc_overhead_limit_was_exceeded=false。
+   只有当gc 时间限制超过了下面的检查时才会设置成true.
+  */
+   *gc_overhead_limit_was_exceeded = false;
 
   HeapWord* result = NULL;
 
-  // Loop until the allocation is satisified,
-  // or unsatisfied after GC.
-  for (int try_count = 1, gclocker_stalled_count = 0; /* return or throw */; try_count += 1) {
+  /* Loop until the allocation is satisified,
+   or unsatisfied after GC.
+   循环直到满足分配为止。或者GC后仍然没有满足
+  */
+   for (int try_count = 1, gclocker_stalled_count = 0; /* return or throw */; try_count += 1) {
     HandleMark hm; // discard any handles allocated in each iteration
 
-    // First allocation attempt is lock-free.
-    Generation *gen0 = gch->get_gen(0);
+    // First allocation attempt is lock-free.第一次尝试分配不需要获取锁
+    Generation *gen0 = gch->get_gen(0);//年轻代
     assert(gen0->supports_inline_contig_alloc(),
       "Otherwise, must do alloc within heap lock");
-    if (gen0->should_allocate(size, is_tlab)) {
-      result = gen0->par_allocate(size, is_tlab);
+    if (gen0->should_allocate(size, is_tlab)) {//对大小进行判断，比如是否超过eden区能分配的最大大小
+      result = gen0->par_allocate(size, is_tlab);//while循环+指针碰撞+CAS分配，什么时候会null呢？
       if (result != NULL) {
         assert(gch->is_in_reserved(result), "result not in heap");
         return result;
       }
     }
-    unsigned int gc_count_before;  // read inside the Heap_lock locked region
+    //如果res=null,表示在eden区分配失败了，因为没有连续的空间。则，继续往下走
+    unsigned int gc_count_before;  // read inside the Heap_lock locked region 在 heap_lock锁定的区域读取
     {
-      MutexLocker ml(Heap_lock);
+      MutexLocker ml(Heap_lock);//获取锁
       if (PrintGC && Verbose) {
         gclog_or_tty->print_cr("TwoGenerationCollectorPolicy::mem_allocate_work:"
                       " attempting locked slow path allocation");
       }
       // Note that only large objects get a shot at being
       // allocated in later generations.
+      //需要注意的是，只有大对象可以被分配在老年代。一般情况下都是false,所以first_only=true
       bool first_only = ! should_try_older_generation_allocation(size);
 
-      result = gch->attempt_allocation(size, is_tlab, first_only);
+      result = gch->attempt_allocation(size, is_tlab, first_only);//在每个代尝试分配
       if (result != NULL) {
         assert(gch->is_in_reserved(result), "result not in heap");
         return result;
       }
-
-      if (GC_locker::is_active_and_needs_gc()) {
+      /*如果仍然=null，则确实是分配失败了
+      is_active_and_needs_gc为true表示有线程在准备进行GC
+      而在is_active_and_needs_gc=TRUE的时候，方法仍能继续执行，
+      是因为想要GC的线程设置了该变量后，会阻塞等待
+      //Gc操作已被触发但还无法被执行,一般不会，只有在jni中获取字符串的指针的时候，避免GC导致位置修改
+      */
+      if (GC_locker::is_active_and_needs_gc()) {  
         if (is_tlab) {
           return NULL;  // Caller will retry allocating individual object
         }
-        if (!gch->is_maximal_no_gc()) {
+        if (!gch->is_maximal_no_gc()) {//因为不能进行GC回收，所以只能扩堆
           // Try and expand heap to satisfy request
           result = expand_heap_and_allocate(size, is_tlab);
           // result could be null if we are out of space
@@ -700,6 +712,11 @@ HeapWord* GenCollectorPolicy::mem_allocate_work(size_t size,
           }
         }
 
+        /*
+        Number of times to retry allocations when "                      \
+          "blocked by the GC locker
+         GCLockerRetryAllocationCount 默认值=2
+        */
         if (gclocker_stalled_count > GCLockerRetryAllocationCount) {
           return NULL; // we didn't get to do a GC and we didn't get any memory
         }
@@ -710,6 +727,13 @@ HeapWord* GenCollectorPolicy::mem_allocate_work(size_t size,
         // initiated by the last thread exiting the critical section; so
         // we retry the allocation sequence from the beginning of the loop,
         // rather than causing more, now probably unnecessary, GC attempts.
+        /*
+        如果当前线程没有位于jni的临界区，将释放Java堆的互斥锁，以使得请求gc的线程可以进行gc操作，
+        等所有本地线程退出临界区和gc完成后，将继续循环尝试分配内存。
+        因为如果当前线程在jni临界区的话，就不能释放锁，只有退出临界区才能释放锁。而如果一直占有锁，
+        请求GC的线程就不能执行，导致死锁。
+        释放互斥锁后，等待GC完然后再次进行分配
+        */
         JavaThread* jthr = JavaThread::current();
         if (!jthr->in_critical()) {
           MutexUnlocker mul(Heap_lock);
@@ -726,25 +750,30 @@ HeapWord* GenCollectorPolicy::mem_allocate_work(size_t size,
         }
       }
 
+      /*
+      GC_locker::is_active_and_needs_gc()一般都是false
+      除非需要进行回收了，则会在相应的collecte方法里面设置为true
+      */
       // Read the gc count while the heap lock is held.
       gc_count_before = Universe::heap()->total_collections();
     }
 
-    VM_GenCollectForAllocation op(size, is_tlab, gc_count_before);
+    VM_GenCollectForAllocation op(size, is_tlab, gc_count_before);//VM操作
     VMThread::execute(&op);
-    if (op.prologue_succeeded()) {
+    if (op.prologue_succeeded()) { //一次Gc操作已完成  
       result = op.result();
-      if (op.gc_locked()) {
+      if (op.gc_locked()) {//当前线程没有成功触发GC(可能刚被其它线程触发了),则继续重试分配  
          assert(result == NULL, "must be NULL if gc_locked() is true");
-         continue;  // retry and/or stall as necessary
+         continue;  // retry and/or stall as necessary 重试分配
       }
 
-      // Allocation has failed and a collection
-      // has been done.  If the gc time limit was exceeded the
-      // this time, return NULL so that an out-of-memory
-      // will be thrown.  Clear gc_overhead_limit_exceeded
-      // so that the overhead exceeded does not persist.
-
+      /* Allocation has failed and a collection
+       has been done.  If the gc time limit was exceeded the
+       this time, return NULL so that an out-of-memory
+       will be thrown.  Clear gc_overhead_limit_exceeded
+       so that the overhead exceeded does not persist.
+      分配失败且回收已经完成了。
+       */
       const bool limit_exceeded = size_policy()->gc_overhead_limit_exceeded();
       const bool softrefs_clear = all_soft_refs_clear();
 
@@ -768,6 +797,7 @@ HeapWord* GenCollectorPolicy::mem_allocate_work(size_t size,
                   " size=" SIZE_FORMAT " %s", try_count, size, is_tlab ? "(TLAB)" : "");
     }
   }
+  //for循环结束
 }
 
 HeapWord* GenCollectorPolicy::expand_heap_and_allocate(size_t size,
@@ -791,15 +821,20 @@ HeapWord* GenCollectorPolicy::satisfy_failed_allocation(size_t size,
   HeapWord* result = NULL;
 
   assert(size != 0, "Precondition violated");
-  if (GC_locker::is_active_and_needs_gc()) {
+  if (GC_locker::is_active_and_needs_gc()) {//如果有其他线程要GC只是被中止了
     // GC locker is active; instead of a collection we will attempt
     // to expand the heap, if there's room for expansion.
-    if (!gch->is_maximal_no_gc()) {
-      result = expand_heap_and_allocate(size, is_tlab);
+    if (!gch->is_maximal_no_gc()) {//尽量不gc
+      result = expand_heap_and_allocate(size, is_tlab);//扩堆
     }
     return result;   // could be null if we are out of space
   } else if (!gch->incremental_collection_will_fail(false /* don't consult_young */)) {
-    // Do an incremental collection.
+    /* Do an incremental collection. 
+    做一个增量式的回收，即如果最近发生过一次担保失败，或者在最近一次GC时老年代放不下年轻代剩余的，则就进行full gc
+    注意的是，该值在CMS的sweep阶段会清除为false。
+    在进行young gc的时候，会判断担保是否安全。若安全，则进行gc。
+    若不安全，则设置incremental_collection_will_fail标记位，然后在后面的代码中进行full gc
+    */
     gch->do_collection(false            /* full */,
                        false            /* clear_all_soft_refs */,
                        size             /* size */,
@@ -828,7 +863,7 @@ HeapWord* GenCollectorPolicy::satisfy_failed_allocation(size_t size,
   }
 
   // OK, collection failed, try expansion.
-  result = expand_heap_and_allocate(size, is_tlab);
+  result = expand_heap_and_allocate(size, is_tlab);//尝试看看能否扩容后分配
   if (result != NULL) {
     return result;
   }
@@ -841,13 +876,19 @@ HeapWord* GenCollectorPolicy::satisfy_failed_allocation(size_t size,
   {
     UIntFlagSetting flag_change(MarkSweepAlwaysCompactCount, 1); // Make sure the heap is fully compacted
 
+    /*
+    若不安全，则设置incremental_collection_will_fail标记位，然后在后面的代码中进行full gc
+    可以看到，在这进行full gc,同时清除软引用
+    */
     gch->do_collection(true             /* full */,
                        true             /* clear_all_soft_refs */,
                        size             /* size */,
                        is_tlab          /* is_tlab */,
                        number_of_generations() - 1 /* max_level */);
   }
-
+/*
+要是再分配不了，只能报OOM了。。。
+*/
   result = gch->attempt_allocation(size, is_tlab, false /* first_only */);
   if (result != NULL) {
     assert(gch->is_in_reserved(result), "result not in heap");
@@ -939,16 +980,21 @@ MetaWord* CollectorPolicy::satisfy_failed_metadata_allocation(
   } while (true);  // Until a GC is done
 }
 
-// Return true if any of the following is true:
-// . the allocation won't fit into the current young gen heap
-// . gc locker is occupied (jni critical section)
-// . heap memory is tight -- the most recent previous collection
-//   was a full collection because a partial collection (would
-//   have) failed and is likely to fail again
-bool GenCollectorPolicy::should_try_older_generation_allocation(
+/* Return true if any of the following is true:
+ . the allocation won't fit into the current young gen heap
+ . gc locker is occupied (jni critical section)
+ . heap memory is tight -- the most recent previous collection
+   was a full collection because a partial collection (would have) failed 
+   and is likely to fail again
+如果下面的任何一条满足，则返回true
+当前年轻代分配不下word_size大的对象
+gc locker被占用了(jni critical section)
+堆内存很紧张--最近的一次回收是Full gc因为部门收集（可能）失败，而且可能会再次失败
+   */
+   bool GenCollectorPolicy::should_try_older_generation_allocation(
         size_t word_size) const {
   GenCollectedHeap* gch = GenCollectedHeap::heap();
-  size_t gen0_capacity = gch->get_gen(0)->capacity_before_gc();
+  size_t gen0_capacity = gch->get_gen(0)->capacity_before_gc();//eden大小+from大小
   return    (word_size > heap_word_size(gen0_capacity))
          || GC_locker::is_active_and_needs_gc()
          || gch->incremental_collection_failed();
