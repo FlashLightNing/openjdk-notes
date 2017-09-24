@@ -77,7 +77,9 @@ class InterfaceSupport: AllStatic {
   // tracing
   static void trace(const char* result_type, const char* header);
 
-  // Helper methods used to implement +ScavengeALot and +FullGCALot
+  /* Helper methods used to implement +ScavengeALot and +FullGCALot
+  ScavengeALot 和FullGCALot 默认false
+  */
   static void check_gc_alot() { if (ScavengeALot || FullGCALot) gc_alot(); }
   static void gc_alot();
 

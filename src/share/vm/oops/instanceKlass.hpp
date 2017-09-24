@@ -165,10 +165,19 @@ class InstanceKlass: public Klass {
 
   InstanceKlass() { assert(DumpSharedSpaces || UseSharedSpaces, "only for CDS"); }
 
-  // See "The Java Virtual Machine Specification" section 2.16.2-5 for a detailed description
-  // of the class loading & initialization procedure, and the use of the states.
+  /* See "The Java Virtual Machine Specification" section 2.16.2-5 for a detailed description
+   of the class loading & initialization procedure, and the use of the states.
+   allocated,        已分配，未链接，刚被构造器构造出来时
+    loaded,          已经被加载，且添加到了systemDictionary中，保证当被用到时能找到并开始验证。但未链接
+
+    linked,           已经链接了，但是没有初始化
+    being_initialized,         正在初始化
+    fully_initialized,        初始化完成
+    initialization_error       初始化出错
+
+   */
   enum ClassState {
-    allocated,                          // allocated (but not yet linked)
+    allocated,                          // allocated (but not yet linked)已分配，未链接，刚被构造器构造出来时
     loaded,                             // loaded and inserted in class hierarchy (but not linked yet)
     linked,                             // successfully linked/verified (but not initialized yet)
     being_initialized,                  // currently running class initializer
@@ -942,13 +951,21 @@ class InstanceKlass: public Klass {
     return layout_helper_to_size_helper(layout_helper());
   }
 
-  // This bit is initialized in classFileParser.cpp.
-  // It is false under any of the following conditions:
-  //  - the class is abstract (including any interface)
-  //  - the class has a finalizer (if !RegisterFinalizersAtInit)
-  //  - the class size is larger than FastAllocateSizeLimit
-  //  - the class is java/lang/Class, which cannot be allocated directly
-  bool can_be_fastpath_allocated() const {
+  /* This bit is initialized in classFileParser.cpp.
+   It is false under any of the following conditions:
+    - the class is abstract (including any interface)
+    - the class has a finalizer (if !RegisterFinalizersAtInit)
+    - the class size is larger than FastAllocateSizeLimit
+    - the class is java/lang/Class, which cannot be allocated directly
+    这一位在classFileParser.cpp中被初始化
+    在下面的任何一种情况下，该值=false：
+     1.class是抽象类（包括接口）
+     2.这个类实现了finalizer方法
+     （如果!RegisterFinalizersAtInit=true,也就是RegisterFinalizersAtInit=false。即不在初始化的时候注册register方法）
+     3.该类的大小超过FastAllocateSizeLimit（默认128k）
+     4.该类是java.lang.class。它不能被直接分配
+  */
+    bool can_be_fastpath_allocated() const {
     return !layout_helper_needs_slow_path(layout_helper());
   }
 

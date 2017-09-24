@@ -290,10 +290,11 @@ _initiating_occupancy字段表示了触发一次回收时的占用率。除非�
 参数(以下用io表示)，否则，就是通过下面的方式计算：
     f表示MinHeapFreeRatio的值（默认40），CMSTriggerRatio用tr表示,默认值为80，  
  _intiating_occupancy=100-40+40*(CMSTriggerRatio/100)=92%
-
+ 
+ //tr表示触发CMS的比例，默认80%，。IO表示CMSInitiatingOccupancyFraction，即使用率，默认-1
 */
 void ConcurrentMarkSweepGeneration::init_initiating_occupancy(intx io, uintx tr) {
-  //tr表示触发CMS的比例，默认80%，。IO表示CMSInitiatingOccupancyFraction，即使用率，默认-1
+ 
   assert(io <= 100 && tr <= 100, "Check the arguments");
   if (io >= 0) {
     _initiating_occupancy = (double)io / 100.0;
@@ -398,21 +399,30 @@ void CMSStats::adjust_cms_free_adjustment_factor(bool fail, size_t free) {
 use the padded average size of the promotion for each  young generation collection.
 如果设置了PromotionFailureALot为true,在每一个年轻代收集中使用晋升的平均大小。
 判断估计老年代填满需要的时间
+如果cms 剩余的大小<平均晋升大小，则返回0，
+否则，
 */
 double CMSStats::time_until_cms_gen_full() const {
   size_t cms_free = _cms_gen->cmsSpace()->free();
   GenCollectedHeap* gch = GenCollectedHeap::heap();
+  /*
+  年轻代的容量，cms的平均晋升大小
+  */
   size_t expected_promotion = MIN2(gch->get_gen(0)->capacity(),
                                    (size_t) _cms_gen->gc_stats()->avg_promoted()->padded_average());
   if (cms_free > expected_promotion) {
-    // Start a cms collection if there isn't enough space to promote
-    // for the next minor collection.  Use the padded average as
-    // a safety factor.
-    cms_free -= expected_promotion;
+    /* Start a cms collection if there isn't enough space to promote
+     for the next minor collection.  Use the padded average as
+     a safety factor.
+     假设cms_free=100  expected_promotion=10
+    */
+     cms_free -= expected_promotion;
 
-    // Adjust by the safety factor.
+    /* Adjust by the safety factor.
+    CMSIncrementalSafetyFactor 默认10
+    */
     double cms_free_dbl = (double)cms_free;
-    double cms_adjustment = (100.0 - CMSIncrementalSafetyFactor)/100.0;
+    double cms_adjustment = (100.0 - CMSIncrementalSafetyFactor)/100.0;//90%
     // Apply a further correction factor which tries to adjust
     // for recent occurance of concurrent mode failures.
     cms_adjustment = cms_adjustment * cms_free_adjustment_factor(cms_free);
@@ -440,7 +450,8 @@ duration of the cms collection) can be used.  This
  promotion failures early in execution.  This was
  possibly because the averages were not accurate
  enough at the beginning.
- 
+ 比较CMS的持续时间和cms将要回收的剩余时间。
+ 注意的是，从cms收集开始的时间，到cms开始清除的时间
 */
 double CMSStats::time_until_cms_start() const {
   // We add "gc0_period" to the "work" calculation
@@ -1579,6 +1590,8 @@ bool CMSCollector::shouldConcurrentCollect() {
    is full, start a collection.
   如果并不是只有在占用率达到要求的时候才回收，则会动态进行计算
   如果完成CMS回收的所需要的预计的时间小于预计的CMS回收的分代填满的时间，就进行回收
+  UseCMSInitiatingOccupancyOnly 默认值：false,即不开启
+  也就是若没开启UseCMSInitiatingOccupancyOnly，会在老年代的使用率达到50%的时候回收
   */
   if (!UseCMSInitiatingOccupancyOnly) {
     if (stats().valid()) {
@@ -1631,6 +1644,10 @@ bool CMSCollector::shouldConcurrentCollect() {
     return true;
   }
 
+  /*
+  VM_CollectForMetadataAllocation::initiate_concurrent_GC()
+  只有在这才会设置为true
+  */
   if (MetaspaceGC::should_concurrent_collect()) {//检查metaspace是否需要GC
     if (Verbose && PrintGCDetails) {
       gclog_or_tty->print("CMSCollector: collect for metadata allocation ");
@@ -2485,6 +2502,9 @@ void CMSCollector::collect_in_background(bool clear_all_soft_refs, GCCause::Caus
         {
           ReleaseForegroundGC x(this);
           stats().record_cms_begin();
+          /*
+          通过vmthread来做初始标记的工作
+          */
           VM_CMS_Initial_Mark initial_mark_op(this);
           VMThread::execute(&initial_mark_op);
         }

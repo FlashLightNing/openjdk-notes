@@ -3461,7 +3461,9 @@ void Metaspace::deallocate(MetaWord* ptr, size_t word_size, bool is_class) {
   }
 }
 
-
+/*
+在metaspace区域分配
+*/
 MetaWord* Metaspace::allocate(ClassLoaderData* loader_data, size_t word_size,
                               bool read_only, MetaspaceObj::Type type, TRAPS) {
   if (HAS_PENDING_EXCEPTION) {

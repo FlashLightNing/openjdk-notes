@@ -136,7 +136,7 @@ void VM_CMS_Operation::doit_epilogue() {
 }
 
 //////////////////////////////////////////////////////////
-// Methods in class VM_CMS_Initial_Mark
+// Methods in class VM_CMS_Initial_Mark 初始标记
 //////////////////////////////////////////////////////////
 void VM_CMS_Initial_Mark::doit() {
   if (lost_race()) {

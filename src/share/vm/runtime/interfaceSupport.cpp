@@ -75,6 +75,9 @@ void InterfaceSupport::trace(const char* result_type, const char* header) {
   tty->print_cr("%6d  %s", _number_of_calls, header);
 }
 
+/*
+_full_gc_alot和_scavenge_alot
+*/
 void InterfaceSupport::gc_alot() {
   Thread *thread = Thread::current();
   if (!thread->is_Java_thread()) return; // Avoid concurrent calls

@@ -275,7 +275,9 @@ void VM_CollectForMetadataAllocation::doit() {
     log_metaspace_alloc_failure_for_concurrent_GC();
   }
 
-  // Don't clear the soft refs yet.
+  /* Don't clear the soft refs yet.
+  先不清除软引用
+  */
   heap->collect_as_vm_thread(GCCause::_metadata_GC_threshold);
   // After a GC try to allocate without expanding.  Could fail
   // and expansion will be tried below.
@@ -294,12 +296,14 @@ void VM_CollectForMetadataAllocation::doit() {
     return;
   }
 
-  // If expansion failed, do a last-ditch collection and try allocating
-  // again.  A last-ditch collection will clear softrefs.  This
-  // behavior is similar to the last-ditch collection done for perm
-  // gen when it was full and a collection for failed allocation
-  // did not free perm gen space.
-  heap->collect_as_vm_thread(GCCause::_last_ditch_collection);
+  /* If expansion failed, do a last-ditch collection and try allocating
+   again.  A last-ditch collection will clear softrefs.  This
+   behavior is similar to the last-ditch collection done for perm
+   gen when it was full and a collection for failed allocation
+   did not free perm gen space.
+   如果扩容失败，做最后一次回收，且会回收软引用。
+  */
+   heap->collect_as_vm_thread(GCCause::_last_ditch_collection);
   _result = _loader_data->metaspace_non_null()->allocate(_size, _mdtype);
   if (_result != NULL) {
     return;

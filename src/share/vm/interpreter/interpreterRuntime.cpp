@@ -146,7 +146,7 @@ IRT_END
 
 //------------------------------------------------------------------------------------------------------------------------
 // Allocation
-
+//慢速分配路径
 IRT_ENTRY(void, InterpreterRuntime::_new(JavaThread* thread, ConstantPool* pool, int index))
   Klass* k_oop = pool->klass_at(index, CHECK);
   instanceKlassHandle klass (THREAD, k_oop);

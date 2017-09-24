@@ -96,14 +96,17 @@ class VM_GC_Operation: public VM_Operation {
     _gc_locked = false;
 
     _full_gc_count_before = full_gc_count_before;
-    // In ParallelScavengeHeap::mem_allocate() collections can be
-    // executed within a loop and _all_soft_refs_clear can be set
-    // true after they have been cleared by a collection and another
-    // collection started so that _all_soft_refs_clear can be true
-    // when this collection is started.  Don't assert that
-    // _all_soft_refs_clear have to be false here even though
-    // mutators have run.  Soft refs will be cleared again in this
-    // collection.
+    /* In ParallelScavengeHeap::mem_allocate() collections can be
+     executed within a loop and _all_soft_refs_clear can be set
+     true after they have been cleared by a collection and another
+     collection started so that _all_soft_refs_clear can be true
+     when this collection is started.  Don't assert that
+     _all_soft_refs_clear have to be false here even though
+     mutators have run.  Soft refs will be cleared again in this
+     collection.
+     在ps的内存分配方法中，GC可以在一个循环中执行，而且在他们被清除后，_all_soft_refs_clear会被回收器设置成true。
+     然后另外
+     */
   }
   ~VM_GC_Operation() {
     CollectedHeap* ch = Universe::heap();

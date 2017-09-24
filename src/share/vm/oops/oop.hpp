@@ -32,14 +32,18 @@
 #include "utilities/macros.hpp"
 #include "utilities/top.hpp"
 
-// oopDesc is the top baseclass for objects classes.  The {name}Desc classes describe
-// the format of Java objects so the fields can be accessed from C++.
-// oopDesc is abstract.
-// (see oopHierarchy for complete oop class hierarchy)
-//
-// no virtual functions allowed
+/* oopDesc is the top baseclass for objects classes.  The {name}Desc classes describe
+ the format of Java objects so the fields can be accessed from C++.
+ oopDesc is abstract.
+ (see oopHierarchy for complete oop class hierarchy)
 
-// store into oop with store check
+ no virtual functions allowed
+
+ store into oop with store check
+ oopDesc是对象类的顶部的基类。{name}Desc描述了java对象的格式，所以可以从c++中访问这些字段
+ oopDesc是抽象的
+ 没有虚函数
+*/
 template <class T> void oop_store(T* p, oop v);
 template <class T> void oop_store(volatile T* p, oop v);
 
@@ -190,7 +194,9 @@ class oopDesc {
                                          oop compare_value,
                                          bool prebarrier = false);
 
-  // Access to fields in a instanceOop through these methods.
+  /* Access to fields in a instanceOop through these methods.
+  通过这些方法获取一个instanceOop（java类型实例）的字段
+  */
   oop obj_field(int offset) const;
   volatile oop obj_field_volatile(int offset) const;
   void obj_field_put(int offset, oop value);

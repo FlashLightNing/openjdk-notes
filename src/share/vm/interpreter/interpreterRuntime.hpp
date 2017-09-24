@@ -34,9 +34,10 @@
 #include "runtime/thread.inline.hpp"
 #include "utilities/top.hpp"
 
-// The InterpreterRuntime is called by the interpreter for everything
-// that cannot/should not be dealt with in assembly and needs C support.
-
+/* The InterpreterRuntime is called by the interpreter for everything
+ that cannot/should not be dealt with in assembly and needs C support.
+ InterpreterRuntime由解释器调用，为那些不能在汇编中处理，需要C的支持的
+*/
 class InterpreterRuntime: AllStatic {
   friend class BytecodeClosure; // for method and bcp
   friend class PrintingClosure; // for method and bcp
@@ -90,6 +91,7 @@ class InterpreterRuntime: AllStatic {
   static void    register_finalizer(JavaThread* thread, oopDesc* obj);
 
   // Quicken instance-of and check-cast bytecodes
+  //instance-of 和check-cast 用的字节码
   static void    quicken_io_cc(JavaThread* thread);
 
   // Exceptions thrown by the interpreter

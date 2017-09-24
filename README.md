@@ -8,3 +8,5 @@ GC相关的目录：src/share/vm/gc_implementation 和src/share/vm/gc_interface�
 笔记3:http://blog.csdn.net/FoolishAndStupid/article/details/77822827 </br>
 笔记4:http://blog.csdn.net/foolishandstupid/article/details/77826099 </br>
 笔记5:http://blog.csdn.net/foolishandstupid/article/details/77915227 </br>
+笔记6:http://blog.csdn.net/foolishandstupid/article/details/78067913 </br>
+笔记7:http://blog.csdn.net/foolishandstupid/article/details/78078238 </br>

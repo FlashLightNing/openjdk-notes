@@ -1201,6 +1201,9 @@ class ConcurrentMarkSweepGeneration: public CardGeneration {
    hack to allow the collection of the younger gen first if the flag is
    set. This is better than using th policy's should_collect_gen0_first()
    since that causes us to do an extra unnecessary pair of restart-&-stop-world.
+   一次调用该分代的强制的fullgc是否同时收集所有的年轻代？
+   如果flag被设置的话，我们允许先收集年轻代。这比使用策略的should_collect_gen0_first更好
+   因为那会引起我们做额外的没必要的STW的过程
    UseCMSCompactAtFullCollection 默认true
    CollectGen0First 默认false
   */

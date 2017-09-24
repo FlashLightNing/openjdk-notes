@@ -388,7 +388,7 @@ void GenCollectedHeap::do_collection(bool  full,
   {
     FlagSetting fl(_is_gc_active, true);
 
-    bool complete = full && (max_level == (n_gens()-1));
+    bool complete = full && (max_level == (n_gens()-1));//是否是full gc
     const char* gc_cause_prefix = complete ? "Full GC" : "GC";
     gclog_or_tty->date_stamp(PrintGC && PrintGCDateStamps);
     TraceCPUTime tcpu(PrintGCDetails, true, gclog_or_tty);
@@ -399,9 +399,9 @@ void GenCollectedHeap::do_collection(bool  full,
     gc_prologue(complete);
     increment_total_collections(complete);
 
-    size_t gch_prev_used = used();
+    size_t gch_prev_used = used();//统计堆中使用的大小（将每个代使用的大小加起来之和）
 
-    int starting_level = 0;
+    int starting_level = 0;//如果full=false,就从第0个代开始回收。否则，计算从哪开始
     if (full) {
       /* Search for the oldest generation which will collect all younger
        generations, and start collection loop there.
@@ -415,6 +415,7 @@ void GenCollectedHeap::do_collection(bool  full,
       }
     }
 
+    //是否必须为偏向锁存储引用？
     bool must_restore_marks_for_biased_locking = false;
 
     int max_level_collected = starting_level;
@@ -1208,7 +1209,7 @@ void GenCollectedHeap::gc_prologue(bool full) {
   assert(InlineCacheBuffer::is_empty(), "should have cleaned up ICBuffer");
 
   always_do_update_barrier = false;
-  // Fill TLAB's and such
+  // Fill TLAB's and such,在GC前收集所有tlab的统计信息
   CollectedHeap::accumulate_statistics_all_tlabs();
   ensure_parsability(true);   // retire TLABs
 

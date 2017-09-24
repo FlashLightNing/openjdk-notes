@@ -290,7 +290,7 @@ InstanceKlass::InstanceKlass(int vtable_len,
   set_nonstatic_field_size(0);
   set_is_marked_dependent(false);
   set_has_unloaded_dependent(false);
-  set_init_state(InstanceKlass::allocated);
+  set_init_state(InstanceKlass::allocated);//当刚被构造器构造出来时，处于allocated状态
   set_init_thread(NULL);
   set_reference_type(rt);
   set_oop_map_cache(NULL);
@@ -588,6 +588,7 @@ void InstanceKlass::unlink_class() {
   _init_state = loaded;
 }
 
+/*链接*/
 void InstanceKlass::link_class(TRAPS) {
   assert(is_loaded(), "must be loaded");
   if (!is_linked()) {
@@ -611,7 +612,7 @@ bool InstanceKlass::link_class_or_fail(TRAPS) {
 
 bool InstanceKlass::link_class_impl(
     instanceKlassHandle this_oop, bool throw_verifyerror, TRAPS) {
-  // check for error state
+  //如果这个类已经处在出错状态就直接抛出异常
   if (this_oop->is_in_error_state()) {
     ResourceMark rm(THREAD);
     THROW_MSG_(vmSymbols::java_lang_NoClassDefFoundError(),
@@ -645,7 +646,9 @@ bool InstanceKlass::link_class_impl(
     link_class_impl(super, throw_verifyerror, CHECK_false);
   }
 
-  // link all interfaces implemented by this class before linking this class
+  /* link all interfaces implemented by this class before linking this class
+  在链接该类前，链接所有由该类实现的接口类
+  */
   Array<Klass*>* interfaces = this_oop->local_interfaces();
   int num_interfaces = interfaces->length();
   for (int index = 0; index < num_interfaces; index++) {
@@ -724,7 +727,7 @@ bool InstanceKlass::link_class_impl(
         // this_oop->itable()->verify(tty, true);
       }
 #endif
-      this_oop->set_init_state(linked);
+      this_oop->set_init_state(linked);//设置成已经链接
       if (JvmtiExport::should_post_class_prepare()) {
         Thread *thread = THREAD;
         assert(thread->is_Java_thread(), "thread->is_Java_thread()");

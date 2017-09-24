@@ -915,6 +915,7 @@ Klass* SystemDictionary::find(Symbol* class_name,
     return NULL;
   }
 
+  //根据类名和加载器计算hash值，并得到hash值的索引
   unsigned int d_hash = dictionary()->compute_hash(class_name, loader_data);
   int d_index = dictionary()->hash_to_index(d_hash);
 
@@ -1003,7 +1004,7 @@ Klass* SystemDictionary::parse_stream(Symbol* class_name,
                                                              true,
                                                              THREAD);
 
-
+    //从class文件加载完后，将此class信息加入到systemDictionary中。
   if (host_klass.not_null() && k.not_null()) {
     assert(EnableInvokeDynamic, "");
     // If it's anonymous, initialize it now, since nobody else will.
@@ -1620,15 +1621,19 @@ void SystemDictionary::add_to_hierarchy(instanceKlassHandle k, TRAPS) {
   assert(k.not_null(), "just checking");
   assert_locked_or_safepoint(Compile_lock);
 
-  // Link into hierachy. Make sure the vtables are initialized before linking into
+  /* Link into hierachy. Make sure the vtables are initialized before linking into
+  链接到继承树中，确保在链接到继承树之前，vtables已经被初始化了。
+  */
   k->append_to_sibling_list();                    // add to superklass/sibling list
   k->process_interfaces(THREAD);                  // handle all "implements" declarations
   k->set_init_state(InstanceKlass::loaded);
-  // Now flush all code that depended on old class hierarchy.
-  // Note: must be done *after* linking k into the hierarchy (was bug 12/9/97)
-  // Also, first reinitialize vtable because it may have gotten out of synch
-  // while the new class wasn't connected to the class hierarchy.
-  Universe::flush_dependents_on(k);
+  /* Now flush all code that depended on old class hierarchy.
+   Note: must be done *after* linking k into the hierarchy (was bug 12/9/97)
+   Also, first reinitialize vtable because it may have gotten out of synch
+   while the new class wasn't connected to the class hierarchy.
+   刷新所有依赖旧的class依赖树的代码
+  */
+   Universe::flush_dependents_on(k);
 }
 
 // ----------------------------------------------------------------------------

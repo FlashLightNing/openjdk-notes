@@ -29,7 +29,9 @@
 
 /* An instanceOop is an instance of a Java Class
  Evaluating "new HashTable()" will create an instanceOop.
- instanceOop 是java类的实例
+ instanceOop 是java类的实例.
+ new HashTable() 会创建一个instanceOop
+ instanceOopDesc描述java类的实例
 */
 class instanceOopDesc : public oopDesc {
  public:

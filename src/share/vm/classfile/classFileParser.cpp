@@ -117,6 +117,7 @@ void ClassFileParser::parse_constant_pool_entries(int length, TRAPS) {
   int names_count = 0;
 
   // parsing  Index 0 is unused
+  //常量池 索引0没有被用到
   for (int index = 1; index < length; index++) {
     // Each of the following case guarantees one more byte in the stream
     // for the following tag or the access_flags following constant pool,
@@ -322,12 +323,13 @@ inline Symbol* check_symbol_at(constantPoolHandle cp, int index) {
     return NULL;
 }
 
+//常量池转换
 constantPoolHandle ClassFileParser::parse_constant_pool(TRAPS) {
   ClassFileStream* cfs = stream();
   constantPoolHandle nullHandle;
 
   cfs->guarantee_more(3, CHECK_(nullHandle)); // length, first cp tag
-  u2 length = cfs->get_u2_fast();
+  u2 length = cfs->get_u2_fast();//常量池的长度
   guarantee_property(
     length >= 1, "Illegal constant pool size %u in class file %s",
     length, CHECK_(nullHandle));
@@ -3692,7 +3694,7 @@ void ClassFileParser::layout_fields(Handle class_loader,
   info->has_nonstatic_fields = has_nonstatic_fields;
 }
 
-
+//读取class文件并转化
 instanceKlassHandle ClassFileParser::parseClassFile(Symbol* name,
                                                     ClassLoaderData* loader_data,
                                                     Handle protection_domain,
@@ -3804,7 +3806,9 @@ instanceKlassHandle ClassFileParser::parseClassFile(Symbol* name,
       minor_version);
   }
 
-  // Check version numbers - we check this even with verifier off
+  /* Check version numbers - we check this even with verifier off
+  版本号校验--即使关闭了校验器，我们也会校验
+  */
   if (!is_supported_version(major_version, minor_version)) {
     if (name == NULL) {
       Exceptions::fthrow(
@@ -3831,16 +3835,18 @@ instanceKlassHandle ClassFileParser::parseClassFile(Symbol* name,
     }
     return nullHandle;
   }
-
+//版本号校验
   _major_version = major_version;
   _minor_version = minor_version;
 
 
-  // Check if verification needs to be relaxed for this class file
-  // Do not restrict it to jdk1.0 or jdk1.1 to maintain backward compatibility (4982376)
+  /* Check if verification needs to be relaxed for this class file
+   Do not restrict it to jdk1.0 or jdk1.1 to maintain backward compatibility (4982376)
+   不要将其限制为jdk1.0或jdk1.1，以保持向后兼容性。
+  */
   _relax_verify = Verifier::relax_verify_for(class_loader());
 
-  // Constant pool
+  // Constant pool常量池
   constantPoolHandle cp = parse_constant_pool(CHECK_(nullHandle));
 
   int cp_size = cp->length();
@@ -3849,7 +3855,7 @@ instanceKlassHandle ClassFileParser::parseClassFile(Symbol* name,
 
   // Access flags
   AccessFlags access_flags;
-  jint flags = cfs->get_u2_fast() & JVM_RECOGNIZED_CLASS_MODIFIERS;
+  jint flags = cfs->get_u2_fast() & JVM_RECOGNIZED_CLASS_MODIFIERS;//获取类的访问标识
 
   if ((flags & JVM_ACC_INTERFACE) && _major_version < JAVA_6_VERSION) {
     // Set abstract bit for old class files for backward compatibility
@@ -3859,7 +3865,7 @@ instanceKlassHandle ClassFileParser::parseClassFile(Symbol* name,
   access_flags.set_flags(flags);
 
   // This class and superclass
-  u2 this_class_index = cfs->get_u2_fast();
+  u2 this_class_index = cfs->get_u2_fast();//当前类在常量池的的索引
   check_property(
     valid_cp_range(this_class_index, cp_size) &&
       cp->tag_at(this_class_index).is_unresolved_klass(),
@@ -3906,7 +3912,7 @@ instanceKlassHandle ClassFileParser::parseClassFile(Symbol* name,
       return nullHandle;
     }
 
-    if (TraceClassLoadingPreorder) {
+    if (TraceClassLoadingPreorder) {//打印类加载
       tty->print("[Loading %s", (name != NULL) ? name->as_klass_external_name() : "NoName");
       if (cfs->source() != NULL) tty->print(" from %s", cfs->source());
       tty->print_cr("]");
@@ -3924,17 +3930,18 @@ instanceKlassHandle ClassFileParser::parseClassFile(Symbol* name,
     }
 #endif
 
-    u2 super_class_index = cfs->get_u2_fast();
+    u2 super_class_index = cfs->get_u2_fast();//获取超类（父类）的索引
     instanceKlassHandle super_klass = parse_super_class(super_class_index,
                                                         CHECK_NULL);
 
     // Interfaces
-    u2 itfs_len = cfs->get_u2_fast();
+    u2 itfs_len = cfs->get_u2_fast();//接口的数量
+    //接口数组
     Array<Klass*>* local_interfaces =
       parse_interfaces(itfs_len, protection_domain, _class_name,
                        &has_default_methods, CHECK_(nullHandle));
 
-    u2 java_fields_count = 0;
+    u2 java_fields_count = 0;//属性的数量
     // Fields (offsets are filled in later)
     FieldAllocationCount fac;
     Array<u2>* fields = parse_fields(class_name,
@@ -4022,7 +4029,7 @@ instanceKlassHandle ClassFileParser::parseClassFile(Symbol* name,
 
     // Size of Java vtable (in words)
     int vtable_size = 0;
-    int itable_size = 0;
+    int itable_size = 0;//接口表大小
     int num_miranda_methods = 0;
 
     GrowableArray<Method*> all_mirandas(20);
@@ -4049,7 +4056,9 @@ instanceKlassHandle ClassFileParser::parseClassFile(Symbol* name,
       rt = super_klass->reference_type();
     }
 
-    // We can now create the basic Klass* for this klass
+    /* We can now create the basic Klass* for this klass
+    我们现在可以为这个Klass创建基本的Klass* 创建instanceKlass
+    */
     _klass = InstanceKlass::allocate_instance_klass(loader_data,
                                                     vtable_size,
                                                     itable_size,

@@ -121,13 +121,17 @@ void GC_locker::jni_lock(JavaThread* thread) {//进入临界区前占有该锁
   increment_debug_jni_lock_count();
 }
 
-//退出临界区后释放该锁
+//退出临界区后释放该锁，并发起一次由gclocker触发的gc
 void GC_locker::jni_unlock(JavaThread* thread) {
   assert(thread->in_last_critical(), "should be exiting critical region");
   MutexLocker mu(JNICritical_lock);
   _jni_lock_count--;
   decrement_debug_jni_lock_count();
   thread->exit_critical();
+  /*
+  减少计数器之后如果=0，则表示这个是最后一个退出jni的线程，
+  则需要触发一次有gclocker的GC
+  */
   if (needs_gc() && !is_active_internal()) {
     // We're the last thread out. Cause a GC to occur.
     _doing_gc = true;

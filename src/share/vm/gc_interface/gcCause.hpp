@@ -41,39 +41,43 @@ class GCCause : public AllStatic {
     _java_lang_system_gc,
     _full_gc_alot,
     _scavenge_alot,
-    _allocation_profiler,
+    _allocation_profiler,//无
     _jvmti_force_gc,
     _gc_locker,
-    _heap_inspection,
+    _heap_inspection,//jamp -histo:live/all时
     _heap_dump,
+    /*
+    https://wiki.openjdk.java.net/display/HotSpot/The+WhiteBox+testing+API
+    */
     _wb_young_gc,
-    _update_allocation_context_stats_inc,
-    _update_allocation_context_stats_full,
+    //没有调用
+    _update_allocation_context_stats_inc,//无
+    _update_allocation_context_stats_full,//无
 
     /* implementation independent, but reserved for GC use */
-    _no_gc,
-    _no_cause_specified,
+    _no_gc,//无
+    _no_cause_specified,//无
     _allocation_failure,
 
     /* implementation specific */
 
-    _tenured_generation_full,
+    _tenured_generation_full,//无
     _metadata_GC_threshold,
 
-    _cms_generation_full,
+    _cms_generation_full,//无
     _cms_initial_mark,
     _cms_final_remark,
     _cms_concurrent_mark,
 
-    _old_generation_expanded_on_last_scavenge,
-    _old_generation_too_full_to_scavenge,
-    _adaptive_size_policy,
+    _old_generation_expanded_on_last_scavenge,//无
+    _old_generation_too_full_to_scavenge,//无
+    _adaptive_size_policy,//PSScavenge中使用
 
-    _g1_inc_collection_pause,
-    _g1_humongous_allocation,
+    _g1_inc_collection_pause,//G1分配时
+    _g1_humongous_allocation,//分配超大对象不够时触发的GC
 
     _last_ditch_collection,
-    _last_gc_cause
+    _last_gc_cause//无
   };
 
 /*

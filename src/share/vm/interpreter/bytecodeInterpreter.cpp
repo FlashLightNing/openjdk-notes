@@ -1801,7 +1801,7 @@ run:
 
       /* monitorenter and monitorexit for locking/unlocking an object */
 
-      CASE(_monitorenter): {
+      CASE(_monitorenter): {//synchronized块，偏向锁等逻辑
         oop lockee = STACK_OBJECT(-1);
         // derefing's lockee ought to provoke implicit null check
         CHECK_NULL(lockee);
@@ -2053,7 +2053,7 @@ run:
       CASE(_putfield):
       CASE(_putstatic):
         {
-          u2 index = Bytes::get_native_u2(pc+1);
+          u2 index = Bytes::get_native_u2(pc+1);//pc存的是指令
           ConstantPoolCacheEntry* cache = cp->entry_at(index);
           if (!cache->is_resolved((Bytecodes::Code)opcode)) {
             CALL_VM(InterpreterRuntime::resolve_get_put(THREAD, (Bytecodes::Code)opcode),
@@ -2161,20 +2161,20 @@ run:
       CASE(_new): {
         u2 index = Bytes::get_Java_u2(pc+1);
         ConstantPool* constants = istate->method()->constants();
-        if (!constants->tag_at(index).is_unresolved_klass()) {
+        if (!constants->tag_at(index).is_unresolved_klass()) {//如果已经解析过了
           // Make sure klass is initialized and doesn't have a finalizer
-          Klass* entry = constants->slot_at(index).get_klass();
+          Klass* entry = constants->slot_at(index).get_klass();//根据index获取常量池中的位置
           assert(entry->is_klass(), "Should be resolved klass");
           Klass* k_entry = (Klass*) entry;
           assert(k_entry->oop_is_instance(), "Should be InstanceKlass");
           InstanceKlass* ik = (InstanceKlass*) k_entry;
-          if ( ik->is_initialized() && ik->can_be_fastpath_allocated() ) {
+          if ( ik->is_initialized() && ik->can_be_fastpath_allocated() ) {//如果已经初始化且可以被快速分配
             size_t obj_size = ik->size_helper();
             oop result = NULL;
             // If the TLAB isn't pre-zeroed then we'll have to do it
             bool need_zero = !ZeroTLAB;
             if (UseTLAB) {
-              result = (oop) THREAD->tlab().allocate(obj_size);
+              result = (oop) THREAD->tlab().allocate(obj_size);//直接在tlab上分配
             }
             // Disable non-TLAB-based fast-path, because profiling requires that all
             // allocations go through InterpreterRuntime::_new() if THREAD->tlab().allocate
@@ -2184,9 +2184,9 @@ run:
               need_zero = true;
               // Try allocate in shared eden
             retry:
-              HeapWord* compare_to = *Universe::heap()->top_addr();
+              HeapWord* compare_to = *Universe::heap()->top_addr();//分配失败则在eden分配，CAS来保证
               HeapWord* new_top = compare_to + obj_size;
-              if (new_top <= *Universe::heap()->end_addr()) {
+              if (new_top <= *Universe::heap()->end_addr()) {//如果能分配得下
                 if (Atomic::cmpxchg_ptr(new_top, Universe::heap()->top_addr(), compare_to) != compare_to) {
                   goto retry;
                 }
@@ -2196,15 +2196,15 @@ run:
 #endif
             if (result != NULL) {
               // Initialize object (if nonzero size and need) and then the header
-              if (need_zero ) {
+              if (need_zero ) {//填充0
                 HeapWord* to_zero = (HeapWord*) result + sizeof(oopDesc) / oopSize;
                 obj_size -= sizeof(oopDesc) / oopSize;
                 if (obj_size > 0 ) {
                   memset(to_zero, 0, obj_size * HeapWordSize);
                 }
               }
-              if (UseBiasedLocking) {
-                result->set_mark(ik->prototype_header());
+              if (UseBiasedLocking) {//如果使用偏向锁，需要在markword上记录
+                result->set_mark(ik->prototype_header());//设置标记头
               } else {
                 result->set_mark(markOopDesc::prototype());
               }
@@ -2218,7 +2218,7 @@ run:
             }
           }
         }
-        // Slow case allocation
+        // Slow case allocation慢速分配路径
         CALL_VM(InterpreterRuntime::_new(THREAD, METHOD->constants(), index),
                 handle_exception);
         // Must prevent reordering of stores for object initialization
