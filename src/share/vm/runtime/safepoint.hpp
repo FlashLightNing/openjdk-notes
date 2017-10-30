@@ -34,7 +34,7 @@
 #include "utilities/ostream.hpp"
 
 //
-// Safepoint synchronization
+// Safepoint synchronization 安全区同步
 ////
 // The VMThread or CMS_thread uses the SafepointSynchronize::begin/end
 // methods to enter/exit a safepoint region. The begin method will roll

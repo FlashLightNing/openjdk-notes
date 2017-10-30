@@ -554,8 +554,8 @@ void GraphKit::builtin_throw(Deoptimization::DeoptReason reason, Node* arg) {
    Note:   If the deopt count has blown up, the uncommon trap
    runtime is going to flush this nmethod, not matter what.
    如果经常发生这种情况，一种罕见的问题可能导致性能的低谷。
-   如果有一个本地的异常处理器，而且如果这个特殊的字节码需要经常优化
-   让我们处理异常内联，使用预先构造的实例。
+   如果有一个本地的异常处理器，而且如果这个特殊的字节码需要经常逆优化
+   让我们将异常内联，使用预先构造的实例。
    注意：如果优化数量上升，这个不常见的可能刷新该方法，无论什么。
   */
    if (treat_throw_as_hot

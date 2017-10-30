@@ -832,8 +832,10 @@ static void *java_start(Thread *thread) {
 
 bool os::create_thread(Thread* thread, ThreadType thr_type, size_t stack_size) {
   assert(thread->osthread() == NULL, "caller responsible");
-
-  // Allocate the OSThread object
+//进入之前，thread->osthread() == NULL为true
+  /* Allocate the OSThread object
+创建osthread
+  */
   OSThread* osthread = new OSThread(NULL, NULL);
   if (osthread == NULL) {
     return false;
@@ -867,7 +869,7 @@ bool os::create_thread(Thread* thread, ThreadType thr_type, size_t stack_size) {
         break;
       case os::compiler_thread:
         if (CompilerThreadStackSize > 0) {
-          stack_size = (size_t)(CompilerThreadStackSize * K);
+          stack_size = (size_t)(CompilerThreadStackSize * K);//K表示1kb,CompilerThreadStackSize默认4096
           break;
         } // else fall through:
           // use VMThreadStackSize if CompilerThreadStackSize is not defined
@@ -880,7 +882,7 @@ bool os::create_thread(Thread* thread, ThreadType thr_type, size_t stack_size) {
       }
     }
 
-    stack_size = MAX2(stack_size, os::Linux::min_stack_allowed);
+    stack_size = MAX2(stack_size, os::Linux::min_stack_allowed);//linux限制了最大是128k
     pthread_attr_setstacksize(&attr, stack_size);
   } else {
     // let pthread_create() pick the default value.
@@ -899,15 +901,22 @@ bool os::create_thread(Thread* thread, ThreadType thr_type, size_t stack_size) {
     }
 
     pthread_t tid;
+    /*
+    pthread_create是类Unix操作系统（Unix、Linux、Mac OS X等）的创建线程的函数。
+    它的功能是创建线程（实际上就是确定调用该线程函数的入口点），在线程创建以后，就开始运行相关的线程函数。
+pthread_create的返回值 表示成功，返回0；表示出错，返回表示-1。
+    */
     int ret = pthread_create(&tid, &attr, (void* (*)(void*)) java_start, thread);
 
     pthread_attr_destroy(&attr);
 
-    if (ret != 0) {
+    if (ret != 0) {//表示出错则返回-1
       if (PrintMiscellaneous && (Verbose || WizardMode)) {
         perror("pthread_create()");
       }
-      // Need to clean up stuff we've allocated so far
+      /* Need to clean up stuff we've allocated so far
+      就算前面赋值了不为null，这里也可能又赋值为null
+      */
       thread->set_osthread(NULL);
       delete osthread;
       if (lock) os::Linux::createThread_lock()->unlock();

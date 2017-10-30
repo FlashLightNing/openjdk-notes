@@ -1199,7 +1199,7 @@ class ConcurrentMarkSweepGeneration: public CardGeneration {
   /* Does a "full" (forced) collection invoked on this generation collect
    all younger generations as well? Note that the second conjunct is a
    hack to allow the collection of the younger gen first if the flag is
-   set. This is better than using th policy's should_collect_gen0_first()
+   set. This is better than using th policy's should_collect_gen0_first()should_collect_gen0_first()
    since that causes us to do an extra unnecessary pair of restart-&-stop-world.
    一次调用该分代的强制的fullgc是否同时收集所有的年轻代？
    如果flag被设置的话，我们允许先收集年轻代。这比使用策略的should_collect_gen0_first更好
